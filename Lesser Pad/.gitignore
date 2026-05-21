@@ -1,0 +1,19 @@
+# Build outputs
+build/
+.gradle/
+app/build/
+
+# Local IDE / SDK config
+local.properties
+.idea/
+*.iml
+captures/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Signing keys (don't ever commit these)
+*.jks
+*.keystore
+!debug.keystore
