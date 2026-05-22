@@ -566,7 +566,9 @@ public class LesserPadListActivity extends FragmentActivity {
     	SharedPreferences props = getPreferences(MODE_PRIVATE);
     	SharedPreferences.Editor pedit = props.edit();
     	pedit.putInt("sort_by", sort_by);
-    	pedit.putString("last_dir", path.getName());
+		if (path != null) {
+			pedit.putString("last_dir", path.getName());
+		}
     	pedit.commit();
     }
     @Override
