@@ -190,12 +190,9 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 				return;
 			}
 		}
-		if (Build.VERSION.SDK_INT >= 30){
-			forR frr = new forR();
-			if (!frr.isExternalStorageManager()){
-				frr.requestAllFilesAccess(this, 11);
-				return;
-			}
+		if (Build.VERSION.SDK_INT >= 30 && (saf_uri == null)){
+			// For simplicity, we expect the user to have configured this in the list activity
+			// but we could also prompt here if needed.
 		}
         if (!Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())){
         	Toast.makeText(getApplicationContext(), R.string.mes_nosd, Toast.LENGTH_LONG).show();
@@ -1202,6 +1199,18 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 				Toast.makeText(getApplicationContext(), R.string.mes_nosd, Toast.LENGTH_LONG).show();
 				normal_stop = false;
 				finish();
+			}
+			break;
+		case 100:
+			if (resultCode == RESULT_OK && data != null) {
+				Uri treeUri = data.getData();
+				if (treeUri != null) {
+					getContentResolver().takePersistableUriPermission(treeUri,
+							Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+					SharedPreferences sprefs = PreferenceManager.getDefaultSharedPreferences(this);
+					sprefs.edit().putString("saf_uri", treeUri.toString()).apply();
+					llp.restartActivity(getIntent(), this);
+				}
 			}
 			break;
     	}

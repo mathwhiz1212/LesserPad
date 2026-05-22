@@ -75,14 +75,8 @@ public class CategoryEditor extends Activity {
 				return;
 			}
 		}
-		if (Build.VERSION.SDK_INT >= 30){
-			forR frr = new forR();
-			if (!frr.isExternalStorageManager()){
-				frr.requestAllFilesAccess(this, 11);
-				return;
-			}
-		}
-		if (!Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())){
+		// Using SAF handles folder access on API 30+
+		if (!Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState()) && Build.VERSION.SDK_INT < 30){
 			Toast.makeText(getApplicationContext(), R.string.mes_nosd, Toast.LENGTH_LONG).show();
 			normal_stop = false;
 			finish();

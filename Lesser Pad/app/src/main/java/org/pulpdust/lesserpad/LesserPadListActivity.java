@@ -110,11 +110,9 @@ public class LesserPadListActivity extends FragmentActivity {
 		}
 
 		if (Build.VERSION.SDK_INT >= 30 && (saf_uri_string == null || saf_uri_string.isEmpty())){
-			forR frr = new forR();
-			if (!frr.isExternalStorageManager()){
-				frr.requestAllFilesAccess(this, 11);
-				return;
-			}
+			Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+			startActivityForResult(intent, 100);
+			return;
 		}
 
         if (saf_uri == null && !Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())){
@@ -500,6 +498,22 @@ public class LesserPadListActivity extends FragmentActivity {
 		case 11:
 			if (Build.VERSION.SDK_INT >= 30 && new forR().isExternalStorageManager()){
 				llp.restartActivity(getIntent(), this);
+			} else {
+				Toast.makeText(getApplicationContext(), R.string.mes_nosd, Toast.LENGTH_LONG).show();
+				normal_stop = false;
+				finish();
+			}
+			break;
+		case 100:
+			if (resultCode == RESULT_OK && data != null) {
+				Uri treeUri = data.getData();
+				if (treeUri != null) {
+					getContentResolver().takePersistableUriPermission(treeUri,
+							Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+					SharedPreferences sprefs = PreferenceManager.getDefaultSharedPreferences(this);
+					sprefs.edit().putString("saf_uri", treeUri.toString()).apply();
+					llp.restartActivity(getIntent(), this);
+				}
 			} else {
 				Toast.makeText(getApplicationContext(), R.string.mes_nosd, Toast.LENGTH_LONG).show();
 				normal_stop = false;
