@@ -12,6 +12,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class DocumentHelper {
@@ -21,9 +22,12 @@ public class DocumentHelper {
         List<DocumentFile> files = new ArrayList<>();
         DocumentFile root = DocumentFile.fromTreeUri(context, treeUri);
         if (root != null && root.isDirectory()) {
-            for (DocumentFile file : root.listFiles()) {
-                if (file.isFile()) {
-                    files.add(file);
+            DocumentFile[] rootFiles = root.listFiles();
+            if (rootFiles != null) {
+                for (DocumentFile file : rootFiles) {
+                    if (file.isFile()) {
+                        files.add(file);
+                    }
                 }
             }
         }
@@ -34,9 +38,12 @@ public class DocumentHelper {
         List<DocumentFile> dirs = new ArrayList<>();
         DocumentFile root = DocumentFile.fromTreeUri(context, treeUri);
         if (root != null && root.isDirectory()) {
-            for (DocumentFile file : root.listFiles()) {
-                if (file.isDirectory()) {
-                    dirs.add(file);
+            DocumentFile[] rootFiles = root.listFiles();
+            if (rootFiles != null) {
+                for (DocumentFile file : rootFiles) {
+                    if (file.isDirectory()) {
+                        dirs.add(file);
+                    }
                 }
             }
         }
