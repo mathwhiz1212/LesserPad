@@ -101,14 +101,6 @@ public class LesserPadListActivity extends FragmentActivity {
 			}
 		}
 
-		if (Build.VERSION.SDK_INT >= 33) {
-			forM fmm = new forM();
-			if (fmm.selfCheckPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-					!= PermissionChecker.PERMISSION_GRANTED) {
-				fmm.selfRequestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 12);
-			}
-		}
-
 		if (Build.VERSION.SDK_INT >= 30 && (saf_uri_string == null || saf_uri_string.isEmpty())){
 			Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
 			startActivityForResult(intent, 100);
