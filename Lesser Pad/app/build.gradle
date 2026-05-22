@@ -1,12 +1,12 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 32
+    compileSdk 34
     buildToolsVersion '33.0.2'
     defaultConfig {
         applicationId "org.pulpdust.lesserpad"
         minSdk 26
-        targetSdk 32
+        targetSdk 34
     }
     buildTypes {
         release {
@@ -16,7 +16,8 @@ android {
     }
     productFlavors {
     }
-    compileSdk 32
+    compileSdk 34
+    namespace 'org.pulpdust.lesserpad'
 }
 
 dependencies {

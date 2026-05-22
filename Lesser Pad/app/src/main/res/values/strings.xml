@@ -98,4 +98,8 @@
     <string name="menu_dontsave">Close without Save</string>
 
     <string name="label_done">Done</string>
+
+    <string name="pref_saf_dir">Storage Folder</string>
+    <string name="pref_saf_dir_desc">Select a folder to store your notes using the system picker.</string>
+    <string name="mes_saf_error">Could not access the selected folder.</string>
 </resources>

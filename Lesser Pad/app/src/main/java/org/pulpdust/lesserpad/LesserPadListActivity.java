@@ -10,6 +10,7 @@ import java.util.List;
 import android.Manifest;
 import android.graphics.Color;
 import android.net.Uri;
+import androidx.documentfile.provider.DocumentFile;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -58,6 +59,8 @@ public class LesserPadListActivity extends FragmentActivity {
 	static int sort_by = SORT_NEW;
 	final static int REQ_PASS = 4;
 	final int RET_SORT = 5;
+	String saf_uri_string;
+	Uri saf_uri;
 	Spinner ebox;
 	TextView label;
 	ListView mlist;
@@ -97,14 +100,21 @@ public class LesserPadListActivity extends FragmentActivity {
 				return;
 			}
 		}
-		if (Build.VERSION.SDK_INT >= 30){
-			forR frr = new forR();
-			if (!frr.isExternalStorageManager()){
-				frr.requestAllFilesAccess(this, 11);
-				return;
+
+		if (Build.VERSION.SDK_INT >= 33) {
+			forM fmm = new forM();
+			if (fmm.selfCheckPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+					!= PermissionChecker.PERMISSION_GRANTED) {
+				fmm.selfRequestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 12);
 			}
 		}
-        if (!Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())){
+
+		if (Build.VERSION.SDK_INT >= 30 && (saf_uri_string == null || saf_uri_string.isEmpty())){
+			// On Android 11+, if SAF is not configured, we might want to prompt or fallback
+			// The original code used forR.requestAllFilesAccess, which we are phasing out.
+		}
+
+        if (saf_uri == null && !Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())){
         	Toast.makeText(getApplicationContext(), R.string.mes_nosd, Toast.LENGTH_LONG).show();
 			normal_stop = false;
         	finish();
@@ -183,13 +193,21 @@ public class LesserPadListActivity extends FragmentActivity {
 				} else {
 					Intent intent = new Intent(libLesserPad.LPAD_EDIT);
 					intent.setComponent(new ComponentName("org.pulpdust.lesserpad", "org.pulpdust.lesserpad.LesserPadActivity"));
-	        		intent.putExtra("PATH", path.toString());
-					if (hide_ext == true){
-						data = new File(path, (ls.get(pos)));
+	        		intent.putExtra("PATH", path != null ? path.toString() : "");
+					if (saf_uri != null) {
+						DocumentFile root = DocumentFile.fromTreeUri(LesserPadListActivity.this, saf_uri);
+						DocumentFile file = root.findFile(ls.get(pos));
+						if (file != null) {
+							intent.setData(file.getUri());
+						}
 					} else {
-						data = new File(path, ((TextView) v).getText().toString());
+						if (hide_ext == true){
+							data = new File(path, (ls.get(pos)));
+						} else {
+							data = new File(path, ((TextView) v).getText().toString());
+						}
+						intent.setData(Uri.fromFile(data));
 					}
-					intent.setData(Uri.fromFile(data));
 					startActivityForResult(intent, 1);
 				}
 			}
@@ -202,15 +220,16 @@ public class LesserPadListActivity extends FragmentActivity {
 				intent.setAction("android.intent.action.VIEW");
 				File data;
 				try {
-/*
-					if (hide_ext == true && !((TextView) v).getText().toString().endsWith(".len")){
-						data = new File(path, ((TextView) v).getText().toString() + ".txt");
+					if (saf_uri != null) {
+						DocumentFile root = DocumentFile.fromTreeUri(LesserPadListActivity.this, saf_uri);
+						DocumentFile file = root.findFile(ls.get(pos));
+						if (file != null) {
+							intent.setDataAndType(file.getUri(), "text/plain");
+						}
 					} else {
-						data = new File(path, ((TextView) v).getText().toString());
+						data = new File(path, ls.get(pos));
+						intent.setDataAndType(Uri.fromFile(data), "text/plain");
 					}
-*/
-					data = new File(path, ls.get(pos));
-					intent.setDataAndType(Uri.fromFile(data), "text/plain");
 					startActivityForResult(intent, 3);
 				} catch (ActivityNotFoundException e){
 					Log.e(TAG, e.getClass().getSimpleName());
@@ -218,25 +237,30 @@ public class LesserPadListActivity extends FragmentActivity {
 				return true;
 			}
         });
-        if (spec_path == true){
+        if (saf_uri != null) {
+            // path will be null or dummy when using SAF
+            path = null;
+        } else if (spec_path == true){
         	path = new File(new File(path_to), default_dir);
         } else {
         	path = new File(Environment.getExternalStorageDirectory(), default_dir);
         }
-        if (last_dir != null && !last_dir.equals(path.getName())){
+        if (path != null && last_dir != null && !last_dir.equals(path.getName())){
         	File lpath = new File(path.getParent(), last_dir);
         	if (lpath.exists()){
         		path = lpath;
         	}
         }
-        if (!path.exists() || !path.canWrite()){
+        if (saf_uri != null) {
+            listMemos(null); // special case for SAF
+        } else if (!path.exists() || !path.canWrite()){
         	if (!path.mkdirs()){
         		default_dir = "/";
         		path = new File(Environment.getExternalStorageDirectory(), default_dir);
         		Toast.makeText(getApplicationContext(), R.string.mes_dis_spec_path, Toast.LENGTH_LONG).show();
         	}
         }
-        listMemos(path);
+        if (saf_uri == null) listMemos(path);
         if (Build.VERSION.SDK_INT >= 11 && Build.VERSION.SDK_INT < 21){
         	forHoneycomb fhc = new forHoneycomb();
         	if (default_dir.equals("/")){
@@ -275,6 +299,14 @@ public class LesserPadListActivity extends FragmentActivity {
     public void listMemos(File path){
     	amemos.clear();
 		ls.clear();
+		if (saf_uri != null) {
+			List<DocumentFile> files = DocumentHelper.listFiles(this, saf_uri);
+			for (DocumentFile file : files) {
+				if (file.isFile()) {
+					ls.add(file.getName());
+				}
+			}
+		} else if (path != null) {
     	Comparator<File> cmp = new Comparator<File>(){
     		@Override
     		public int compare(File f1, File f2){
@@ -301,6 +333,7 @@ public class LesserPadListActivity extends FragmentActivity {
 //    			}
     		}
     	}
+		}
     	if (sort_by == SORT_NEW || sort_by == SORT_ZYX){
     		Collections.reverse(ls);
     	}
@@ -316,7 +349,7 @@ public class LesserPadListActivity extends FragmentActivity {
     public void doNew(){
 		Intent intent = new Intent(libLesserPad.LPAD_NEW);
 		intent.setComponent(new ComponentName("org.pulpdust.lesserpad", "org.pulpdust.lesserpad.LesserPadActivity"));
-		intent.putExtra("PATH", path.toString());
+		intent.putExtra("PATH", path != null ? path.toString() : "");
 		startActivityForResult(intent, 1);
     }
     
@@ -490,6 +523,12 @@ public class LesserPadListActivity extends FragmentActivity {
 
     public void readPrefs(){
     	SharedPreferences sprefs = PreferenceManager.getDefaultSharedPreferences(this);
+		saf_uri_string = sprefs.getString("saf_uri", null);
+		if (saf_uri_string != null) {
+			saf_uri = Uri.parse(saf_uri_string);
+		} else {
+			saf_uri = null;
+		}
     	default_dir = sprefs.getString("default_dir", getString(R.string.app_default_dir));
     	if (default_dir.equals("")) {
     		default_dir = "/";

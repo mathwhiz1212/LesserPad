@@ -58,6 +58,7 @@ import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
+import androidx.documentfile.provider.DocumentFile;
 import android.widget.Toast;
 //import android.widget.Toolbar;
 
@@ -90,6 +91,7 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 	String path_to;
 	boolean abarnotsplit;
 	boolean wosave;
+	Uri saf_uri;
 	EditText etxt;
 //	static Editable edit;
 	Spinner ebox;
@@ -448,6 +450,14 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 			suri = suri.substring(7);
 		}
     	try {
+			String content;
+			if (uri.getScheme() != null && (uri.getScheme().equals("content") || uri.getScheme().equals("file"))) {
+				content = DocumentHelper.readFile(this, uri);
+				DocumentFile df = DocumentFile.fromSingleUri(this, uri);
+				if (df != null) {
+					name = df.getName();
+				}
+			} else {
         	File file = new File(URLDecoder.decode(suri, "UTF-8"));
 			if (pathWithinRoot(file.getParent()) == null){
 				Log.e(TAG, "fileOpen::OutsideRoot");
@@ -456,7 +466,6 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 			}
 			FileReader fr = new FileReader(file);
 			BufferedReader br = new BufferedReader(fr);
-			String content;
 			StringBuilder contb = new StringBuilder(4096);
 //			content = br.readLine();
 			contb.append(br.readLine());
@@ -466,6 +475,9 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 				contb.append("\n" + line);
 			}
 			content = contb.toString();
+			br.close();
+			}
+
 			if (content == null) content = "";
 			if (suri.endsWith(".len") && pass != null){
 				forFroyo ffy = new forFroyo();
@@ -476,7 +488,6 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 //			origin = getSum(content);
 			former = content;
 			etxt.setText(content);
-			br.close();
 			return true;
 		} catch (FileNotFoundException e) {
 			Log.e(TAG, "fileOpen::NotFound");
@@ -544,6 +555,17 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 	    	}
     }
     public boolean textFiling(String text){
+		if (saf_uri != null) {
+			if (name.equals("")) {
+				name = enTitle(0, etxt.getText().toString().split("\n")[0]);
+				if (!name.endsWith(".txt")) name += ".txt";
+			}
+			if (DocumentHelper.writeFile(this, saf_uri, name, text)) {
+				former = etxt.getText().toString();
+				return true;
+			}
+			return false;
+		}
         if (!path.exists()){
         	path.mkdirs();
         }
@@ -1254,6 +1276,12 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
     }
     public void readPrefs(){
     	SharedPreferences sprefs = PreferenceManager.getDefaultSharedPreferences(this);
+		String saf_uri_string = sprefs.getString("saf_uri", null);
+		if (saf_uri_string != null) {
+			saf_uri = Uri.parse(saf_uri_string);
+		} else {
+			saf_uri = null;
+		}
     	default_dir = sprefs.getString("default_dir", getString(R.string.app_default_dir));
     	cur_pos = Integer.parseInt(sprefs.getString("cur_pos", "1"));
     	font_size = Float.parseFloat(sprefs.getString("font_size", "18.0f"));
