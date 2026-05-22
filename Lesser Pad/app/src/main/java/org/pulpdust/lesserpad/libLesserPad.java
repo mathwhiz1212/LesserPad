@@ -41,6 +41,7 @@ public class libLesserPad {
     		Activity av, String action){
 		if (path == null) return;
     	adirs.clear();
+		if (dirs != null) dirs.clear();
     	File base = path.getParentFile();
     	String cur = path.getName();
     	String list[] = base.list();
@@ -49,9 +50,10 @@ public class libLesserPad {
     		File who = new File(base, list[index]);
     		if (who.isDirectory() && !list[index].matches("^\\.{1}.+$")){
     			adirs.add(list[index]);
+				if (dirs != null) dirs.add(list[index]);
     		}
     	}
-    	int pos = dirs.indexOf(cur);
+    	int pos = (dirs != null) ? dirs.indexOf(cur) : -1;
     	if (ebox != null){
     		ebox.setSelection(pos);
     	}

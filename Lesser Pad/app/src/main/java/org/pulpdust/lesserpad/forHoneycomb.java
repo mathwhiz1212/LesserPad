@@ -87,7 +87,7 @@ public class forHoneycomb {
 				public boolean onNavigationItemSelected(int pos,
 						long id) {
 					if (mode == 0){
-						LesserPadActivity.doMove(av.getApplicationContext(), pos);
+						((LesserPadActivity) av).doMove(av.getApplicationContext(), pos);
 					} else if (mode == 1){
 						LesserPadListActivity lla = (LesserPadListActivity) av;
 						lla.doChange(pos);

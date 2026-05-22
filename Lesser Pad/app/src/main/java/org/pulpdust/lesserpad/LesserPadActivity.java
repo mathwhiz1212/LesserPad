@@ -23,6 +23,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.preference.PreferenceManager;
+import android.provider.DocumentsContract;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -92,6 +93,7 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 	boolean abarnotsplit;
 	boolean wosave;
 	Uri saf_uri;
+	Uri current_saf_uri;
 	EditText etxt;
 //	static Editable edit;
 	Spinner ebox;
@@ -194,7 +196,13 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 			// For simplicity, we expect the user to have configured this in the list activity
 			// but we could also prompt here if needed.
 		}
-        if (!Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())){
+		if (saf_uri != null) {
+			current_saf_uri = intent.getData();
+			if (current_saf_uri == null || current_saf_uri.toString().equals(saf_uri.toString())) {
+				current_saf_uri = saf_uri;
+			}
+		}
+        if (!Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState()) && Build.VERSION.SDK_INT < 30){
         	Toast.makeText(getApplicationContext(), R.string.mes_nosd, Toast.LENGTH_LONG).show();
         	normal_stop = false;
         	finish();
@@ -314,7 +322,12 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
         	}
         } else {
         }
-        if (path.equals(Environment.getExternalStorageDirectory())){
+		if (saf_uri != null) {
+			ebox.setEnabled(true);
+			ebox.setVisibility(View.VISIBLE);
+			label.setVisibility(View.VISIBLE);
+			listDirs();
+		} else if (path.equals(Environment.getExternalStorageDirectory())){
         	ebox.setEnabled(false);
         } else {
         	llp.listDir(path, adirs, dirs, ebox, this, action);
@@ -397,6 +410,7 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
     @Override
     public void onSaveInstanceState(Bundle sis){
     	if (path != null) sis.putString("path", path.toString());
+		if (current_saf_uri != null) sis.putString("current_saf_uri", current_saf_uri.toString());
     	sis.putString("name", name);
     	if (pass != null) sis.putString("pass", pass);
     	if (former != null) sis.putString("former", former);
@@ -424,7 +438,40 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 			}
 		}
 	}
-    public static void doMove(Context context, int pos){
+    public void doMove(Context context, int pos){
+		if (saf_uri != null) {
+			if (fmode == FILE_NEW) {
+				if (pos == 0) {
+					current_saf_uri = saf_uri;
+				} else {
+					DocumentFile root = DocumentFile.fromTreeUri(context, saf_uri);
+					DocumentFile sub = root.findFile(dirs.get(pos));
+					if (sub != null) current_saf_uri = sub.getUri();
+				}
+			} else if (fmode == FILE_OPEN) {
+				Uri targetFolderUri;
+				if (pos == 0) {
+					targetFolderUri = saf_uri;
+				} else {
+					DocumentFile root = DocumentFile.fromTreeUri(context, saf_uri);
+					DocumentFile sub = root.findFile(dirs.get(pos));
+					targetFolderUri = (sub != null) ? sub.getUri() : null;
+				}
+				if (targetFolderUri != null && !targetFolderUri.toString().equals(current_saf_uri.toString())) {
+					try {
+						Uri newUri = DocumentsContract.moveDocument(context.getContentResolver(), getIntent().getData(), current_saf_uri, targetFolderUri);
+						if (newUri != null) {
+							current_saf_uri = targetFolderUri;
+							getIntent().setData(newUri);
+						}
+					} catch (Exception e) {
+						Log.e(TAG, "SAF Move failed", e);
+						Toast.makeText(context, R.string.mes_move_fail, Toast.LENGTH_SHORT).show();
+					}
+				}
+			}
+			return;
+		}
 		if (fmode == FILE_NEW){
 			File base = path.getParentFile();
 			path = new File(base, "/" + dirs.get(pos));
@@ -557,7 +604,7 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 				name = enTitle(0, etxt.getText().toString().split("\n")[0]);
 				if (!name.endsWith(".txt")) name += ".txt";
 			}
-			if (DocumentHelper.writeFile(this, saf_uri, name, text)) {
+			if (DocumentHelper.writeFile(this, current_saf_uri, name, text)) {
 				former = etxt.getText().toString();
 				return true;
 			}
@@ -1368,6 +1415,29 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 			undo_text = s.toString().substring(start, start + count);
 		}
 	}
-	
+
+	public void listDirs() {
+		if (saf_uri != null) {
+			adirs.clear();
+			dirs.clear();
+			adirs.add("/");
+			dirs.add("/");
+			List<DocumentFile> subdirs = DocumentHelper.listDirs(this, saf_uri);
+			for (DocumentFile d : subdirs) {
+				adirs.add(d.getName());
+				dirs.add(d.getName());
+			}
+			// find current position
+			int pos = 0;
+			if (current_saf_uri != null && !current_saf_uri.toString().equals(saf_uri.toString())) {
+				DocumentFile current = DocumentFile.fromTreeUri(this, current_saf_uri);
+				if (current != null) {
+					pos = dirs.indexOf(current.getName());
+					if (pos < 0) pos = 0;
+				}
+			}
+			ebox.setSelection(pos);
+		}
+	}
 
 }

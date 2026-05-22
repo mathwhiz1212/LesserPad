@@ -15,7 +15,9 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import androidx.core.content.PermissionChecker;
+import androidx.documentfile.provider.DocumentFile;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -47,6 +49,7 @@ public class CategoryEditor extends Activity {
 	File parent;
 	String name;
 	boolean isable;
+	Uri saf_uri;
 	libLesserPad llp = new libLesserPad();
 	boolean normal_stop = true;
 
@@ -120,17 +123,44 @@ public class CategoryEditor extends Activity {
 			public void onItemClick(AdapterView<?> av, View v, int pos,
 					long id) {
 				String choice = dirs.get(mlist.getCheckedItemPosition());
-				if (name.equals(choice)){
-					isable = setAble(false, isDeletable(choice));
-				} else {
+				if (saf_uri != null) {
 					isable = setAble(true, isDeletable(choice));
+				} else {
+					if (name.equals(choice)){
+						isable = setAble(false, isDeletable(choice));
+					} else {
+						isable = setAble(true, isDeletable(choice));
+					}
 				}
 			}
         });
-        llp.listDir(path, adirs, dirs, null, null, null);
+        listDirs();
     }
+
+	public void listDirs() {
+		if (saf_uri != null) {
+			adirs.clear();
+			dirs.clear();
+			List<DocumentFile> subdirs = DocumentHelper.listDirs(this, saf_uri);
+			for (DocumentFile d : subdirs) {
+				adirs.add(d.getName());
+				dirs.add(d.getName());
+			}
+		} else {
+			dirs.clear();
+			llp.listDir(path, adirs, dirs, null, null, null);
+		}
+	}
     
     public boolean isDeletable(String name){
+		if (saf_uri != null) {
+			DocumentFile root = DocumentFile.fromTreeUri(this, saf_uri);
+			DocumentFile dir = root.findFile(name);
+			if (dir != null) {
+				return dir.listFiles().length == 0;
+			}
+			return false;
+		}
     	File object = new File(parent, name);
     	String list[] = object.list();
     	if (list.length > 0){
@@ -154,20 +184,28 @@ public class CategoryEditor extends Activity {
 		}
 		builder.setPositiveButton(R.string.dialog_ok, new DialogInterface.OnClickListener(){
 			public void onClick(DialogInterface dialog, int id) {
-				boolean success;
+				boolean success = false;
 				String naming = input.getText().toString();
-				if (oldname != null && !naming.equals("")){
-					File dir = new File(parent, oldname);
-					File newname = new File(parent, naming);
-					success = dir.renameTo(newname);
-				} else if (!naming.equals("")) {
-					File newdir = new File(parent, naming);
-					success = newdir.mkdirs();
+				if (saf_uri != null) {
+					DocumentFile root = DocumentFile.fromTreeUri(CategoryEditor.this, saf_uri);
+					if (oldname != null && !naming.equals("")) {
+						DocumentFile dir = root.findFile(oldname);
+						if (dir != null) success = dir.renameTo(naming);
+					} else if (!naming.equals("")) {
+						success = root.createDirectory(naming) != null;
+					}
 				} else {
-					success = false;
+					if (oldname != null && !naming.equals("")){
+						File dir = new File(parent, oldname);
+						File newname = new File(parent, naming);
+						success = dir.renameTo(newname);
+					} else if (!naming.equals("")) {
+						File newdir = new File(parent, naming);
+						success = newdir.mkdirs();
+					}
 				}
 				if (success){
-					llp.listDir(path, adirs, dirs, null, null, null);
+					listDirs();
 					dialog.dismiss();
 				} else {
 					Toast.makeText(getApplicationContext(), R.string.mes_edit_fail_dir, Toast.LENGTH_SHORT).show();
@@ -187,8 +225,17 @@ public class CategoryEditor extends Activity {
     	       .setCancelable(false)
     	       .setPositiveButton(R.string.dialog_ok, new DialogInterface.OnClickListener() {
     	           public void onClick(DialogInterface dialog, int id) {
-    	        	   if (LesserPadActivity.doDelete(parent, dirs.get(mlist.getCheckedItemPosition()))){
-    	        	       llp.listDir(path, adirs, dirs, null, null, null);
+					   boolean success = false;
+					   if (saf_uri != null) {
+						   DocumentFile root = DocumentFile.fromTreeUri(CategoryEditor.this, saf_uri);
+						   DocumentFile dir = root.findFile(dirs.get(mlist.getCheckedItemPosition()));
+						   if (dir != null) success = dir.delete();
+					   } else {
+						   success = LesserPadActivity.doDelete(parent, dirs.get(mlist.getCheckedItemPosition()));
+					   }
+
+    	        	   if (success){
+    	        	       listDirs();
     	        		   dialog.dismiss();
     	        	   } else {
     	        		   Toast.makeText(getApplicationContext(), R.string.mes_del_fail_dir, Toast.LENGTH_SHORT).show();
@@ -222,6 +269,12 @@ public class CategoryEditor extends Activity {
 //    }
     public void readPrefs(){
     	SharedPreferences sprefs = PreferenceManager.getDefaultSharedPreferences(this);
+		String saf_uri_string = sprefs.getString("saf_uri", null);
+		if (saf_uri_string != null) {
+			saf_uri = Uri.parse(saf_uri_string);
+		} else {
+			saf_uri = null;
+		}
     	default_dir = sprefs.getString("default_dir", getString(R.string.app_default_dir));
     	font_size = Float.parseFloat(sprefs.getString("font_size", "16.0f"));
     	look_style = Integer.parseInt(sprefs.getString("look_style", "0"));

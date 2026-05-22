@@ -22,10 +22,25 @@ public class DocumentHelper {
         DocumentFile root = DocumentFile.fromTreeUri(context, treeUri);
         if (root != null && root.isDirectory()) {
             for (DocumentFile file : root.listFiles()) {
-                files.add(file);
+                if (file.isFile()) {
+                    files.add(file);
+                }
             }
         }
         return files;
+    }
+
+    public static List<DocumentFile> listDirs(Context context, Uri treeUri) {
+        List<DocumentFile> dirs = new ArrayList<>();
+        DocumentFile root = DocumentFile.fromTreeUri(context, treeUri);
+        if (root != null && root.isDirectory()) {
+            for (DocumentFile file : root.listFiles()) {
+                if (file.isDirectory()) {
+                    dirs.add(file);
+                }
+            }
+        }
+        return dirs;
     }
 
     public static String readFile(Context context, Uri fileUri) throws IOException {
