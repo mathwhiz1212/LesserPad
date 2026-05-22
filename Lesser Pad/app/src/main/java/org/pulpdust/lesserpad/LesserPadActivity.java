@@ -182,7 +182,7 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
         	this.getWindow().setSoftInputMode(LayoutParams.SOFT_INPUT_STATE_UNCHANGED);
         }
         setContentView(R.layout.activity_lesser_pad);
-		if (Build.VERSION.SDK_INT >= 23){
+		if (Build.VERSION.SDK_INT >= 23 && Build.VERSION.SDK_INT < 30){
 			forM fmm = new forM();
 			if (fmm.selfCheckPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
 					!= PermissionChecker.PERMISSION_GRANTED){

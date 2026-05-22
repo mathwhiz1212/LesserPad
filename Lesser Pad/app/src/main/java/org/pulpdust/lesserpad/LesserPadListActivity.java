@@ -92,7 +92,7 @@ public class LesserPadListActivity extends FragmentActivity {
     	super.onCreate(savedInstanceState);
 //        requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.activity_lesser_pad_list);
-		if (Build.VERSION.SDK_INT >= 23){
+		if (Build.VERSION.SDK_INT >= 23 && Build.VERSION.SDK_INT < 30){
 			forM fmm = new forM();
 			if (fmm.selfCheckPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
 					!= PermissionChecker.PERMISSION_GRANTED){
@@ -110,8 +110,11 @@ public class LesserPadListActivity extends FragmentActivity {
 		}
 
 		if (Build.VERSION.SDK_INT >= 30 && (saf_uri_string == null || saf_uri_string.isEmpty())){
-			// On Android 11+, if SAF is not configured, we might want to prompt or fallback
-			// The original code used forR.requestAllFilesAccess, which we are phasing out.
+			forR frr = new forR();
+			if (!frr.isExternalStorageManager()){
+				frr.requestAllFilesAccess(this, 11);
+				return;
+			}
 		}
 
         if (saf_uri == null && !Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())){

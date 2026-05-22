@@ -67,7 +67,7 @@ public class CategoryEditor extends Activity {
     	}
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_category_editor);
-		if (Build.VERSION.SDK_INT >= 23){
+		if (Build.VERSION.SDK_INT >= 23 && Build.VERSION.SDK_INT < 30){
 			forM fmm = new forM();
 			if (fmm.selfCheckPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
 					!= PermissionChecker.PERMISSION_GRANTED){
