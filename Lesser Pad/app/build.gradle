@@ -2,7 +2,6 @@ apply plugin: 'com.android.application'
 
 android {
     compileSdk 34
-    buildToolsVersion '33.0.2'
     defaultConfig {
         applicationId "org.pulpdust.lesserpad"
         minSdk 26
@@ -13,6 +12,9 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
         }
+    }
+    buildFeatures {
+        buildConfig = true
     }
     productFlavors {
     }
