@@ -39,6 +39,7 @@ public class libLesserPad {
 
     public void listDir(File path, ArrayAdapter<String> adirs, List<String> dirs, Spinner ebox, 
     		Activity av, String action){
+		if (path == null) return;
     	adirs.clear();
     	File base = path.getParentFile();
     	String cur = path.getName();

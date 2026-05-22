@@ -270,8 +270,12 @@ public class LesserPadListActivity extends FragmentActivity {
             	fhc.setActionBar(this, 1, adirs, 1);
         	}
         }
-        if (default_dir.equals("/")){
+        if (default_dir.equals("/") || saf_uri != null){
         	ebox.setEnabled(false);
+			if (saf_uri != null) {
+				ebox.setVisibility(View.GONE);
+				label.setVisibility(View.GONE);
+			}
         } else {
         	llp.listDir(path, adirs, dirs, ebox, this, null);
         }
