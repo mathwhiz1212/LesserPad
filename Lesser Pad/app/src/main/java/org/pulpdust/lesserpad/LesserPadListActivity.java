@@ -284,6 +284,27 @@ public class LesserPadListActivity extends FragmentActivity {
 		ls.clear();
 		if (current_saf_uri != null) {
 			List<DocumentFile> files = DocumentHelper.listFiles(this, current_saf_uri);
+			
+			// Sort files based on user preference
+			java.util.Collections.sort(files, new java.util.Comparator<DocumentFile>() {
+				@Override
+				public int compare(DocumentFile f1, DocumentFile f2) {
+					String n1 = f1.getName() != null ? f1.getName() : "";
+					String n2 = f2.getName() != null ? f2.getName() : "";
+					switch (sort_by) {
+						case SORT_ABC:
+							return n1.compareToIgnoreCase(n2);
+						case SORT_ZYX:
+							return n2.compareToIgnoreCase(n1);
+						case SORT_OLD:
+							return Long.compare(f1.lastModified(), f2.lastModified());
+						case SORT_NEW:
+						default:
+							return Long.compare(f2.lastModified(), f1.lastModified());
+					}
+				}
+			});
+
 			for (DocumentFile file : files) {
 				String fname = file.getName();
 				if (fname != null && (fname.toLowerCase().endsWith(".txt") || fname.toLowerCase().endsWith(".len"))) {
