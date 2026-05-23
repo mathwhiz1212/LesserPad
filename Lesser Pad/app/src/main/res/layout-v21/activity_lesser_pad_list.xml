@@ -64,7 +64,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/label_new"
-            android:width="96dip" />
+            android:width="96dip"
+            android:visibility="gone" />
 
         <Toolbar
             android:id="@+id/toolBar2"

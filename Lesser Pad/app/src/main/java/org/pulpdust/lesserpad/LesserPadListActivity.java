@@ -104,17 +104,19 @@ public class LesserPadListActivity extends FragmentActivity {
         adirs = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, dirs);
         adirs.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         ebox.setAdapter(adirs);
-        newbtn.setOnClickListener(new OnClickListener(){
-        	@Override
-        	public void onClick(View v){
-        		doNew();
-        	}
-        });
+        if (newbtn != null) {
+            newbtn.setOnClickListener(new OnClickListener(){
+                @Override
+                public void onClick(View v){
+                    doNew();
+                }
+            });
+            if (Build.VERSION.SDK_INT >= 11 && Build.VERSION.SDK_INT < 21){
+                newbtn.setVisibility(View.GONE);
+            }
+        }
 		if (Build.VERSION.SDK_INT >= 21){
 			forLollipop.readyActionBar(findViewById(R.id.toolBar2), this, 0, look_style, false);
-		}
-		if (Build.VERSION.SDK_INT >= 11 && Build.VERSION.SDK_INT < 21){
-			newbtn.setVisibility(View.GONE);
 		}
 		if (look_style > 0 && Build.VERSION.SDK_INT >= 21){
 			label.setTextColor(Color.rgb(192, 192, 192));
