@@ -77,6 +77,7 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 	TextView label;
 	static List<String> dirs = new ArrayList<String>();
 	ArrayAdapter<String> adirs;
+	static String disuse = "[\"|:;,'*?<>/\\\\^]";
 	String chmark = "*";
 	String former;
 	static String action;
@@ -393,6 +394,20 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
         }
     	return newname;
     }
+
+	public static boolean doDelete(File path, String name){
+		File object;
+		if (name == null){
+			object = new File(path.toString());
+		} else {
+			object = new File(path, name);
+		}
+		if (object.delete()){
+			return true;
+		} else {
+			return false;
+		}
+	}
 
 	public void listDirs() {
 		if (saf_uri != null) {
