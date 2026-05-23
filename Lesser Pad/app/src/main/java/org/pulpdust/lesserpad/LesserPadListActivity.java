@@ -234,7 +234,14 @@ public class LesserPadListActivity extends FragmentActivity {
         if (saf_uri != null) {
             // path will be null or dummy when using SAF
             path = null;
-			if (current_saf_uri == null) current_saf_uri = saf_uri;
+			if (current_saf_uri == null) {
+				String lastSub = getPreferences(MODE_PRIVATE).getString("last_sub_uri", null);
+				if (lastSub != null) {
+					current_saf_uri = Uri.parse(lastSub);
+				} else {
+					current_saf_uri = saf_uri;
+				}
+			}
         } else if (spec_path == true){
         	path = new File(new File(path_to), default_dir);
         } else {
@@ -298,6 +305,8 @@ public class LesserPadListActivity extends FragmentActivity {
 					current_saf_uri = sub.getUri();
 				}
 			}
+			// Save current subfolder selection
+			getPreferences(MODE_PRIVATE).edit().putString("last_sub_uri", current_saf_uri.toString()).apply();
 			listMemos(null);
 		} else {
 			if (path != null) {
@@ -324,18 +333,25 @@ public class LesserPadListActivity extends FragmentActivity {
 		}
 	}
 
-    public void listMemos(File path){
+    public void listMemos(File dummy){
     	amemos.clear();
 		memos.clear();
 		ls.clear();
 		if (saf_uri != null) {
 			List<DocumentFile> files = DocumentHelper.listFiles(this, current_saf_uri);
 			for (DocumentFile file : files) {
-				if (file.isFile()) {
-					ls.add(file.getName());
+				String fname = file.getName();
+				if (fname != null && (fname.toLowerCase().endsWith(".txt") || fname.toLowerCase().endsWith(".len"))) {
+					ls.add(fname);
+					if (hide_ext) {
+						memos.add(fname.substring(0, fname.lastIndexOf('.')));
+					} else {
+						memos.add(fname);
+					}
 				}
 			}
-		} else if (path != null) {
+			amemos.notifyDataSetChanged();
+		} else if (dummy != null) {
     	Comparator<File> cmp = new Comparator<File>(){
     		@Override
     		public int compare(File f1, File f2){
