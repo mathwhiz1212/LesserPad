@@ -50,8 +50,9 @@ public class CategoryEditor extends Activity {
 	String name;
 	boolean isable;
 	Uri saf_uri;
+	Uri current_saf_uri;
 	libLesserPad llp = new libLesserPad();
-	boolean normal_stop = true;
+	boolean normal_stop = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -139,16 +140,9 @@ public class CategoryEditor extends Activity {
 
 	public void listDirs() {
 		if (saf_uri != null) {
-			adirs.clear();
-			dirs.clear();
-			List<DocumentFile> subdirs = DocumentHelper.listDirs(this, saf_uri);
-			for (DocumentFile d : subdirs) {
-				adirs.add(d.getName());
-				dirs.add(d.getName());
-			}
+			llp.listDir(null, adirs, dirs, null, this, null);
 		} else {
-			dirs.clear();
-			llp.listDir(path, adirs, dirs, null, null, null);
+			llp.listDir(path, adirs, dirs, null, this, null);
 		}
 	}
     

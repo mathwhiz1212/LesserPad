@@ -187,7 +187,7 @@ public class LesserPadListActivity extends FragmentActivity {
 				} else {
 					Intent intent = new Intent(libLesserPad.LPAD_EDIT);
 					intent.setComponent(new ComponentName("org.pulpdust.lesserpad", "org.pulpdust.lesserpad.LesserPadActivity"));
-	        		intent.putExtra("PATH", path != null ? path.toString() : "");
+	        		intent.putExtra("PATH", (saf_uri != null) ? current_saf_uri.toString() : (path != null ? path.toString() : ""));
 					if (saf_uri != null) {
 						DocumentFile root = DocumentFile.fromTreeUri(LesserPadListActivity.this, current_saf_uri);
 						DocumentFile file = root.findFile(ls.get(pos));
@@ -248,16 +248,7 @@ public class LesserPadListActivity extends FragmentActivity {
         }
         if (saf_uri != null) {
             listMemos(null); // special case for SAF
-			adirs.clear();
-			dirs.clear();
-			adirs.add("/");
-			dirs.add("/");
-			List<DocumentFile> subdirs = DocumentHelper.listDirs(this, saf_uri);
-			for (DocumentFile d : subdirs) {
-				adirs.add(d.getName());
-				dirs.add(d.getName());
-			}
-			ebox.setSelection(0);
+			listDirs();
         } else if (!path.exists() || !path.canWrite()){
         	if (!path.mkdirs()){
         		default_dir = "/";
@@ -276,12 +267,8 @@ public class LesserPadListActivity extends FragmentActivity {
         }
         if (default_dir.equals("/")){
         	ebox.setEnabled(false);
-        } else if (saf_uri != null) {
-			ebox.setEnabled(true);
-			ebox.setVisibility(View.VISIBLE);
-			label.setVisibility(View.VISIBLE);
-		} else {
-        	llp.listDir(path, adirs, dirs, ebox, this, null);
+        } else {
+        	listDirs();
         }
 		ebox.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
 			@Override
@@ -305,16 +292,37 @@ public class LesserPadListActivity extends FragmentActivity {
 				current_saf_uri = saf_uri;
 			} else {
 				DocumentFile root = DocumentFile.fromTreeUri(this, saf_uri);
-				DocumentFile sub = root.findFile(dirs.get(pos));
-				if (sub != null) current_saf_uri = sub.getUri();
+				String folderName = dirs.get(pos);
+				DocumentFile sub = root.findFile(folderName);
+				if (sub != null && sub.isDirectory()) {
+					current_saf_uri = sub.getUri();
+				}
 			}
 			listMemos(null);
-			return;
+		} else {
+			if (path != null) {
+				File base = path.getParentFile();
+				if (base != null) {
+					path = new File(base, dirs.get(pos));
+					listMemos(path);
+				}
+			}
 		}
-		File base = path.getParentFile();
-		path = new File(base, "/" + dirs.get(pos));
-		listMemos(path);
-    }
+	}
+
+	public void listDirs() {
+		String currentName = null;
+		if (saf_uri != null) {
+			if (current_saf_uri != null && !current_saf_uri.equals(saf_uri)) {
+				DocumentFile df = DocumentFile.fromTreeUri(this, current_saf_uri);
+				if (df != null) currentName = df.getName();
+			}
+			llp.listDir(null, adirs, dirs, ebox, this, currentName);
+		} else {
+			if (path != null) currentName = path.getName();
+			llp.listDir(path, adirs, dirs, ebox, this, currentName);
+		}
+	}
 
     public void listMemos(File path){
     	amemos.clear();
@@ -368,14 +376,13 @@ public class LesserPadListActivity extends FragmentActivity {
     }
 
     public void doNew(){
-		Intent intent = new Intent(libLesserPad.LPAD_NEW);
-		intent.setComponent(new ComponentName("org.pulpdust.lesserpad", "org.pulpdust.lesserpad.LesserPadActivity"));
+    	Intent intent = new Intent(libLesserPad.LPAD_NEW);
+    	intent.setComponent(new ComponentName("org.pulpdust.lesserpad", "org.pulpdust.lesserpad.LesserPadActivity"));
+		intent.putExtra("PATH", (saf_uri != null) ? current_saf_uri.toString() : (path != null ? path.toString() : ""));
 		if (saf_uri != null) {
 			intent.setData(current_saf_uri);
-		} else {
-			intent.putExtra("PATH", path != null ? path.toString() : "");
 		}
-		startActivityForResult(intent, 1);
+    	startActivityForResult(intent, 0);
     }
     
     @Override
@@ -460,21 +467,43 @@ public class LesserPadListActivity extends FragmentActivity {
     	switch (requestCode){
     	case 0:
     		readPrefs();
-    		listMemos(path);
+			if (saf_uri != null) {
+				listMemos(null);
+				listDirs();
+			} else {
+    			listMemos(path);
+			}
     		break;
     	case 1:
     		if (resultCode == RESULT_OK && data != null){
-    			path = new File(data.getStringExtra("PATH"));
-    			if (path.equals(Environment.getExternalStorageDirectory()) || default_dir.equals("/")){
-    			} else {
-    				llp.listDir(path, adirs, dirs, ebox, this, null);
-    			}
+				if (saf_uri != null) {
+					String new_parent = data.getStringExtra("PATH");
+					if (new_parent != null) {
+						current_saf_uri = Uri.parse(new_parent);
+					}
+				} else {
+    				path = new File(data.getStringExtra("PATH"));
+    				if (path.equals(Environment.getExternalStorageDirectory()) || default_dir.equals("/")){
+    				} else {
+    					llp.listDir(path, adirs, dirs, ebox, this, null);
+    				}
+				}
     		}
     		readPrefs();
-			listMemos(path);
+			if (saf_uri != null) {
+				listMemos(null);
+				listDirs();
+			} else {
+				listMemos(path);
+			}
     		break;
     	case 2:
-    		if (!path.exists()){
+			if (saf_uri != null) {
+				listMemos(null);
+				listDirs();
+				break;
+			}
+    		if (path == null || !path.exists()){
     			if (spec_path == true){
     				path = new File(new File(path_to), default_dir);
     			} else {

@@ -14,8 +14,11 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.net.Uri;
 import android.os.Build;
+import android.preference.PreferenceManager;
 import android.text.Editable;
+import androidx.documentfile.provider.DocumentFile;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.Spinner;
@@ -39,39 +42,69 @@ public class libLesserPad {
 
     public void listDir(File path, ArrayAdapter<String> adirs, List<String> dirs, Spinner ebox, 
     		Activity av, String action){
+		// Force SAF for Android 15+ (target SDK is likely 35+)
+		SharedPreferences sprefs = PreferenceManager.getDefaultSharedPreferences(av);
+		String saf_uri_string = sprefs.getString("saf_uri", null);
+		if (saf_uri_string != null) {
+			Uri saf_uri = Uri.parse(saf_uri_string);
+			List<DocumentFile> dfiles = DocumentHelper.listDirs(av, saf_uri);
+			adirs.setNotifyOnChange(false);
+			adirs.clear();
+			if (dirs != null) dirs.clear();
+
+			String rootName = av.getString(R.string.app_default_dir);
+			if (dirs != null) {
+				dirs.add(rootName);
+			} else {
+				adirs.add(rootName);
+			}
+
+			for (DocumentFile df : dfiles) {
+				String dname = df.getName();
+				if (dname != null) {
+					if (dirs != null) {
+						dirs.add(dname);
+					} else {
+						adirs.add(dname);
+					}
+				}
+			}
+			adirs.notifyDataSetChanged();
+			
+			int pos = 0;
+			if (action != null) {
+				pos = dirs != null ? dirs.indexOf(action) : adirs.getPosition(action);
+				if (pos < 0) pos = 0;
+			}
+			if (ebox != null) ebox.setSelection(pos);
+			return;
+		}
+		
+		// Legacy fallback (should not be reached on Android 15)
 		if (path == null) return;
+		adirs.setNotifyOnChange(false);
     	adirs.clear();
 		if (dirs != null) dirs.clear();
     	File base = path.getParentFile();
     	String cur = path.getName();
     	String list[] = base.list();
-    	Arrays.sort(list);
-    	for(int index = 0 ; index < list.length; index++){
-    		File who = new File(base, list[index]);
-    		if (who.isDirectory() && !list[index].matches("^\\.{1}.+$")){
-    			adirs.add(list[index]);
-				if (dirs != null) dirs.add(list[index]);
-    		}
-    	}
+		if (list != null) {
+			Arrays.sort(list);
+			for (int index = 0; index < list.length; index++) {
+				File who = new File(base, list[index]);
+				if (who.isDirectory() && !list[index].matches("^\\.{1}.+$")) {
+					if (dirs != null) {
+						dirs.add(list[index]);
+					} else {
+						adirs.add(list[index]);
+					}
+				}
+			}
+		}
+		adirs.notifyDataSetChanged();
     	int pos = (dirs != null) ? dirs.indexOf(cur) : -1;
     	if (ebox != null){
     		ebox.setSelection(pos);
-    	}
-    	if (Build.VERSION.SDK_INT >= 11
-				&& Build.VERSION.SDK_INT < 21
-				&& av != null){
-    		if (
-//					(action != null
-//					&&
-//					!action.equals(Intent.ACTION_EDIT) && !action.equals(Intent.ACTION_VIEW))
-//    				||
-//					(action == null)
-//    				||
-							(Build.VERSION.SDK_INT >= 11 && Build.VERSION.SDK_INT <= 20)
-			){
-    			forHoneycomb fhc = new forHoneycomb();
-    			fhc.setSelection(av, pos);
-    		}
     	}
     }
 
@@ -141,4 +174,3 @@ public class libLesserPad {
 		a.startActivity(i);
 	}
 }
-

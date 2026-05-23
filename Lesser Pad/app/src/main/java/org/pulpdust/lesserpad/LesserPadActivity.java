@@ -112,6 +112,7 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 	static String action;
 	String sname;
 	int sfmode;
+	Uri current_uri;
 	libLesserPad llp = new libLesserPad();
 	static boolean priv = false;
 	String pass = null;
@@ -197,8 +198,15 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 			// but we could also prompt here if needed.
 		}
 		if (saf_uri != null) {
-			current_saf_uri = intent.getData();
-			if (current_saf_uri == null || current_saf_uri.toString().equals(saf_uri.toString())) {
+			if (action.equals(libLesserPad.LPAD_NEW)) {
+				current_saf_uri = intent.getData();
+			} else {
+				String pathExtra = intent.getStringExtra("PATH");
+				if (pathExtra != null) {
+					current_saf_uri = Uri.parse(pathExtra);
+				}
+			}
+			if (current_saf_uri == null) {
 				current_saf_uri = saf_uri;
 			}
 		}
@@ -459,10 +467,15 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 				}
 				if (targetFolderUri != null && !targetFolderUri.toString().equals(current_saf_uri.toString())) {
 					try {
-						Uri newUri = DocumentsContract.moveDocument(context.getContentResolver(), getIntent().getData(), current_saf_uri, targetFolderUri);
-						if (newUri != null) {
+						Uri fileUri = (fmode == FILE_OPEN) ? getIntent().getData() : null;
+						if (fileUri != null) {
+							Uri newUri = DocumentsContract.moveDocument(context.getContentResolver(), fileUri, current_saf_uri, targetFolderUri);
+							if (newUri != null) {
+								current_saf_uri = targetFolderUri;
+								getIntent().setData(newUri);
+							}
+						} else {
 							current_saf_uri = targetFolderUri;
-							getIntent().setData(newUri);
 						}
 					} catch (Exception e) {
 						Log.e(TAG, "SAF Move failed", e);
@@ -489,6 +502,7 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 		}
     }
     public boolean fileOpen(Uri uri){
+		current_uri = uri;
     	String suri = uri.toString();
 		if (suri.startsWith("file://")){
 			suri = suri.substring(7);
@@ -604,8 +618,9 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 				name = enTitle(0, etxt.getText().toString().split("\n")[0]);
 				if (!name.endsWith(".txt")) name += ".txt";
 			}
-			if (DocumentHelper.writeFile(this, current_saf_uri, name, text)) {
+			if (DocumentHelper.writeFile(this, current_saf_uri, name, text + "\n")) {
 				former = etxt.getText().toString();
+				fmode = FILE_OPEN;
 				return true;
 			}
 			return false;
@@ -1008,15 +1023,21 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
     	       .setCancelable(false)
     	       .setPositiveButton(R.string.dialog_ok, new DialogInterface.OnClickListener() {
 				   public void onClick(DialogInterface dialog, int id) {
-					   if (doDelete(path, name)) {
-						   dontsave = true;
-						   if (lmode == 1) {
-							   Intent result = new Intent();
-							   result.putExtra("PATH", path.toString());
-							   av.setResult(RESULT_OK, result);
-						   }
-						   av.finish();
-					   } else {
+		   boolean success;
+		   if (saf_uri != null && current_uri != null) {
+			   success = DocumentHelper.deleteFile(av, current_uri);
+		   } else {
+			   success = doDelete(path, name);
+		   }
+		   if (success) {
+			   dontsave = true;
+			   if (lmode == 1) {
+				   Intent result = new Intent();
+				   result.putExtra("PATH", (saf_uri != null) ? current_saf_uri.toString() : path.toString());
+				   av.setResult(RESULT_OK, result);
+			   }
+			   av.finish();
+		   } else {
 						   Toast.makeText(getApplicationContext(), R.string.mes_del_fail, Toast.LENGTH_SHORT).show();
 						   dialog.dismiss();
 					   }
@@ -1117,7 +1138,11 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 				dontsave = true;
 			}
 			Intent result = new Intent();
-			result.putExtra("PATH", path.toString());
+			if (saf_uri != null) {
+				result.putExtra("PATH", current_saf_uri.toString());
+			} else {
+				result.putExtra("PATH", path.toString());
+			}
 			setResult(RESULT_OK, result);
 			return false;
 		} else {
@@ -1420,13 +1445,12 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 		if (saf_uri != null) {
 			adirs.clear();
 			dirs.clear();
-			adirs.add("/");
 			dirs.add("/");
 			List<DocumentFile> subdirs = DocumentHelper.listDirs(this, saf_uri);
 			for (DocumentFile d : subdirs) {
-				adirs.add(d.getName());
 				dirs.add(d.getName());
 			}
+			adirs.notifyDataSetChanged();
 			// find current position
 			int pos = 0;
 			if (current_saf_uri != null && !current_saf_uri.toString().equals(saf_uri.toString())) {

@@ -90,4 +90,22 @@ public class DocumentHelper {
             return false;
         }
     }
+
+    public static boolean isSaf(Context context) {
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            android.content.SharedPreferences sprefs = android.preference.PreferenceManager.getDefaultSharedPreferences(context);
+            return sprefs.getString("saf_uri", null) != null;
+        }
+        return false;
+    }
+
+    public static DocumentFile getOrCreateFolder(Context context, Uri treeUri, String folderName) {
+        DocumentFile root = DocumentFile.fromTreeUri(context, treeUri);
+        if (root == null) return null;
+        DocumentFile folder = root.findFile(folderName);
+        if (folder == null) {
+            folder = root.createDirectory(folderName);
+        }
+        return folder;
+    }
 }
