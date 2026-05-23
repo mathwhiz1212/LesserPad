@@ -7,6 +7,7 @@ import java.util.List;
 import android.Manifest;
 import android.graphics.Color;
 import android.net.Uri;
+import android.provider.DocumentsContract;
 import androidx.documentfile.provider.DocumentFile;
 import android.os.Build;
 import android.os.Bundle;
@@ -112,7 +113,7 @@ public class LesserPadListActivity extends FragmentActivity {
 		if (Build.VERSION.SDK_INT >= 21){
 			forLollipop.readyActionBar(findViewById(R.id.toolBar2), this, 0, look_style, false);
 		}
-		if (Build.VERSION.SDK_INT >= 11){
+		if (Build.VERSION.SDK_INT >= 11 && Build.VERSION.SDK_INT < 21){
 			newbtn.setVisibility(View.GONE);
 		}
 		if (look_style > 0 && Build.VERSION.SDK_INT >= 21){
@@ -149,10 +150,28 @@ public class LesserPadListActivity extends FragmentActivity {
 					Intent intent = new Intent(libLesserPad.LPAD_EDIT);
 					intent.setComponent(new ComponentName("org.pulpdust.lesserpad", "org.pulpdust.lesserpad.LesserPadActivity"));
 	        		intent.putExtra("PATH", current_saf_uri.toString());
-					DocumentFile root = DocumentFile.fromTreeUri(LesserPadListActivity.this, current_saf_uri);
-					DocumentFile file = root.findFile(ls.get(pos));
-					if (file != null) {
-						intent.setData(file.getUri());
+					try {
+						DocumentFile root = null;
+						if (current_saf_uri.equals(saf_uri)) {
+							root = DocumentFile.fromTreeUri(LesserPadListActivity.this, saf_uri);
+						} else {
+							// For subfolders, fromTreeUri might be risky if not a tree URI
+							if (DocumentsContract.isTreeUri(current_saf_uri)) {
+								root = DocumentFile.fromTreeUri(LesserPadListActivity.this, current_saf_uri);
+							} else {
+								// Try to use it as a tree-aware document URI
+								root = DocumentFile.fromTreeUri(LesserPadListActivity.this, current_saf_uri);
+							}
+						}
+						if (root != null) {
+							DocumentFile file = root.findFile(ls.get(pos));
+							if (file != null) {
+								intent.setData(file.getUri());
+								intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+							}
+						}
+					} catch (Exception e) {
+						Log.e(TAG, "Error in onItemClick", e);
 					}
 					startActivityForResult(intent, 1);
 				}
@@ -165,13 +184,20 @@ public class LesserPadListActivity extends FragmentActivity {
 				Intent intent = new Intent();
 				intent.setAction("android.intent.action.VIEW");
 				try {
-					DocumentFile root = DocumentFile.fromTreeUri(LesserPadListActivity.this, current_saf_uri);
-					DocumentFile file = root.findFile(ls.get(pos));
-					if (file != null) {
-						intent.setDataAndType(file.getUri(), "text/plain");
+					DocumentFile root = null;
+					if (current_saf_uri.equals(saf_uri)) {
+						root = DocumentFile.fromTreeUri(LesserPadListActivity.this, saf_uri);
+					} else {
+						root = DocumentFile.fromTreeUri(LesserPadListActivity.this, current_saf_uri);
+					}
+					if (root != null) {
+						DocumentFile file = root.findFile(ls.get(pos));
+						if (file != null) {
+							intent.setDataAndType(file.getUri(), "text/plain");
+						}
 					}
 					startActivityForResult(intent, 3);
-				} catch (ActivityNotFoundException e){
+				} catch (Exception e){
 					Log.e(TAG, e.getClass().getSimpleName());
 				}
 				return true;
@@ -182,7 +208,12 @@ public class LesserPadListActivity extends FragmentActivity {
 		if (current_saf_uri == null) {
 			String lastSub = getPreferences(MODE_PRIVATE).getString("last_sub_uri", null);
 			if (lastSub != null) {
-				current_saf_uri = Uri.parse(lastSub);
+				try {
+					current_saf_uri = Uri.parse(lastSub);
+				} catch (Exception e) {
+					Log.e(TAG, "Invalid last_sub_uri: " + lastSub, e);
+					current_saf_uri = saf_uri;
+				}
 			} else if (saf_uri != null) {
 				current_saf_uri = saf_uri;
 			}
@@ -211,11 +242,17 @@ public class LesserPadListActivity extends FragmentActivity {
 			if (pos == 0) {
 				current_saf_uri = saf_uri;
 			} else {
-				DocumentFile root = DocumentFile.fromTreeUri(this, saf_uri);
-				String folderName = dirs.get(pos);
-				DocumentFile sub = root.findFile(folderName);
-				if (sub != null && sub.isDirectory()) {
-					current_saf_uri = sub.getUri();
+				try {
+					DocumentFile root = DocumentFile.fromTreeUri(this, saf_uri);
+					if (root != null) {
+						String folderName = dirs.get(pos);
+						DocumentFile sub = root.findFile(folderName);
+						if (sub != null && sub.isDirectory()) {
+							current_saf_uri = sub.getUri();
+						}
+					}
+				} catch (Exception e) {
+					Log.e(TAG, "Error in doChange", e);
 				}
 			}
 			getPreferences(MODE_PRIVATE).edit().putString("last_sub_uri", current_saf_uri.toString()).apply();
@@ -227,8 +264,13 @@ public class LesserPadListActivity extends FragmentActivity {
 		String currentName = null;
 		if (saf_uri != null) {
 			if (current_saf_uri != null && !current_saf_uri.equals(saf_uri)) {
-				DocumentFile df = DocumentFile.fromTreeUri(this, current_saf_uri);
-				if (df != null) currentName = df.getName();
+				try {
+					// Use fromSingleUri to get the name safely without needing tree permissions for this specific URI
+					DocumentFile df = DocumentFile.fromSingleUri(this, current_saf_uri);
+					if (df != null) currentName = df.getName();
+				} catch (Exception e) {
+					Log.e(TAG, "Error in listDirs", e);
+				}
 			}
 			llp.listDir(null, adirs, dirs, ebox, this, currentName);
 		}
@@ -259,10 +301,19 @@ public class LesserPadListActivity extends FragmentActivity {
     }
 
 	public void doNew(){
+		if (current_saf_uri == null) {
+			if (saf_uri != null) {
+				current_saf_uri = saf_uri;
+			} else {
+				// No storage configured
+				return;
+			}
+		}
 		Intent intent = new Intent(libLesserPad.LPAD_NEW);
 		intent.setComponent(new ComponentName("org.pulpdust.lesserpad", "org.pulpdust.lesserpad.LesserPadActivity"));
 		intent.putExtra("PATH", current_saf_uri.toString());
 		intent.setData(current_saf_uri);
+		intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
 		startActivityForResult(intent, 0);
 	}
 
@@ -289,6 +340,9 @@ public class LesserPadListActivity extends FragmentActivity {
     @Override
     public boolean onOptionsItemSelected(MenuItem mi){
     	switch (mi.getItemId()){
+		case android.R.id.home:
+			doNew();
+			return true;
     	case R.id.menu_folder:
     		Intent editfolder = new Intent();
     		editfolder.setClassName("org.pulpdust.lesserpad", "org.pulpdust.lesserpad.CategoryEditor");
@@ -364,10 +418,17 @@ public class LesserPadListActivity extends FragmentActivity {
 				intent.setComponent(new ComponentName("org.pulpdust.lesserpad", "org.pulpdust.lesserpad.LesserPadActivity"));
         		intent.putExtra("PATH", current_saf_uri.toString());
         		intent.putExtra(libLesserPad.CRYPT_PASS, data.getStringExtra(libLesserPad.CRYPT_PASS));
-				DocumentFile root = DocumentFile.fromTreeUri(this, current_saf_uri);
-				DocumentFile file = root.findFile(data.getStringExtra(libLesserPad.CRYPT_FILE));
-				if (file != null) {
-					intent.setData(file.getUri());
+				try {
+					DocumentFile root = DocumentFile.fromTreeUri(this, current_saf_uri);
+					if (root != null) {
+						DocumentFile file = root.findFile(data.getStringExtra(libLesserPad.CRYPT_FILE));
+						if (file != null) {
+							intent.setData(file.getUri());
+							intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+						}
+					}
+				} catch (Exception e) {
+					Log.e(TAG, "Error in REQ_PASS", e);
 				}
 				startActivityForResult(intent, 1);
     		}
@@ -400,7 +461,22 @@ public class LesserPadListActivity extends FragmentActivity {
     	SharedPreferences sprefs = PreferenceManager.getDefaultSharedPreferences(this);
 		saf_uri_string = sprefs.getString("saf_uri", null);
 		if (saf_uri_string != null) {
-			saf_uri = Uri.parse(saf_uri_string);
+			try {
+				Uri uri = Uri.parse(saf_uri_string);
+				if (Build.VERSION.SDK_INT >= 24) {
+					if (DocumentsContract.isTreeUri(uri)) {
+						saf_uri = uri;
+					} else {
+						Log.e(TAG, "saf_uri in prefs is NOT a tree URI: " + saf_uri_string);
+						saf_uri = null;
+					}
+				} else {
+					saf_uri = uri;
+				}
+			} catch (Exception e) {
+				Log.e(TAG, "Error parsing saf_uri", e);
+				saf_uri = null;
+			}
 		} else {
 			saf_uri = null;
 		}

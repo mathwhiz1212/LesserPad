@@ -57,35 +57,29 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 	final static int FILE_OPEN = 1;
 	final static int REQ_PASS_FOR_ENC = 2;
 	final static int REQ_PASS_FOR_DEC = 3;
-	static int fmode;
-	static int lmode;
-	static boolean dontsave = true;
-	static File path;
-	static String name;
-	String default_dir;
+
+	int fmode = FILE_NEW;
+	int lmode = 0;
+	boolean dontsave = true;
+	String name = "";
 	float font_size;
 	static int look_style;
 	static boolean hide_ext;
-	boolean spec_path;
-	String path_to;
 	boolean abarnotsplit;
-	boolean wosave;
 	Uri saf_uri;
 	Uri current_saf_uri;
 	EditText etxt;
 	Spinner ebox;
 	TextView label;
-	static List<String> dirs = new ArrayList<String>();
+	List<String> dirs = new ArrayList<String>();
 	ArrayAdapter<String> adirs;
 	static String disuse = "[\"|:;,'*?<>/\\\\^]";
-	String chmark = "*";
 	String former;
-	static String action;
+	String action;
 	Uri current_uri;
 	libLesserPad llp = new libLesserPad();
-	static boolean priv = false;
+	boolean priv = false;
 	String pass = null;
-	boolean normal_stop = true;
 
 	public static class EditMemo extends EditText {
 		private Rect rt;
@@ -127,7 +121,7 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
         action = intent.getAction();
         readPrefs();
 		if (look_style == -1) {
-			if (getResources().getConfiguration().isNightModeActive()){
+			if (Build.VERSION.SDK_INT >= 30 && getResources().getConfiguration().isNightModeActive()){
 				look_style = 1;
 			} else {
 				look_style = 0;
@@ -151,13 +145,32 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 		if (saf_uri != null) {
 			String pathExtra = intent.getStringExtra("PATH");
 			if (pathExtra != null) {
-				current_saf_uri = Uri.parse(pathExtra);
+				try {
+					current_saf_uri = Uri.parse(pathExtra);
+					// Allow both tree URIs and tree-aware document URIs
+					boolean isTree = false;
+					if (Build.VERSION.SDK_INT >= 24) {
+						isTree = DocumentsContract.isTreeUri(current_saf_uri);
+					}
+					boolean isTreeAwareDoc = current_saf_uri.getPath() != null && current_saf_uri.getPath().contains("/tree/") && current_saf_uri.getPath().contains("/document/");
+					
+					if (Build.VERSION.SDK_INT >= 24 && !isTree && !isTreeAwareDoc) {
+						Log.w(TAG, "PATH extra is not a valid SAF URI, falling back: " + pathExtra);
+						current_saf_uri = saf_uri;
+					}
+				} catch (Exception e) {
+					Log.e(TAG, "Invalid PATH extra: " + pathExtra, e);
+					current_saf_uri = saf_uri;
+				}
 			} else {
 				current_saf_uri = intent.getData();
 			}
 			if (current_saf_uri == null) {
 				current_saf_uri = saf_uri;
 			}
+		} else {
+			// This shouldn't happen on Android 15
+			Log.e(TAG, "No saf_uri configured!");
 		}
 
         etxt = (EditText) findViewById(R.id.editText1);
@@ -176,23 +189,37 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
         }
         if (savedInstanceState != null){
         	name = savedInstanceState.getString("name");
+			fmode = savedInstanceState.getInt("fmode");
 			if (savedInstanceState.getString("current_saf_uri") != null) {
 				current_saf_uri = Uri.parse(savedInstanceState.getString("current_saf_uri"));
 			}
+			if (savedInstanceState.getString("current_uri") != null) {
+				current_uri = Uri.parse(savedInstanceState.getString("current_uri"));
+			}
         	if (savedInstanceState.getString("pass") != null) pass = savedInstanceState.getString("pass");
         	if (savedInstanceState.getString("former") != null) former = savedInstanceState.getString("former");
-        	if (savedInstanceState.getBoolean("priv") != false) priv = savedInstanceState.getBoolean("priv");
+        	priv = savedInstanceState.getBoolean("priv");
         }
         
         if (Intent.ACTION_EDIT.equals(action) || 
         		Intent.ACTION_VIEW.equals(action) || 
         		libLesserPad.LPAD_EDIT.equals(action)){
-        	if (savedInstanceState != null && curi != null){
-        		fileOpened(curi);
-        	} else if (curi != null && fileOpen(curi)){
-        		fileOpened(curi);
-        	} else {
-        		Log.e(TAG, "fileOpen failed.");
+        	if (savedInstanceState != null && current_uri != null){
+        		// Already loaded from savedInstanceState
+        	} else if (curi != null) {
+                if (DocumentHelper.isDirectory(this, curi)) {
+                    // It's a directory, treat as NEW in this directory
+                    current_saf_uri = curi;
+                    fmode = FILE_NEW;
+                    name = "";
+                } else if (fileOpen(curi)) {
+                    // Opened successfully
+                } else {
+                    Log.e(TAG, "fileOpen failed. action=" + action + " curi=" + curi);
+                    Toast.makeText(this, R.string.mes_not_open, Toast.LENGTH_SHORT).show();
+                }
+            } else {
+        		Log.e(TAG, "No URI provided for edit/view action");
         		Toast.makeText(this, R.string.mes_not_open, Toast.LENGTH_SHORT).show();
         	}
         	if (libLesserPad.LPAD_EDIT.equals(action)){
@@ -201,9 +228,21 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
         		lmode = 0;
         	}
         } else if (libLesserPad.LPAD_NEW.equals(action) || Intent.ACTION_SEND.equals(action) || Intent.ACTION_MAIN.equals(action)){
-        	if (savedInstanceState != null && curi != null && fileOpen(curi)){
-        		fileOpened(curi);
-        	} else {
+        	if (savedInstanceState != null){
+				// Keep current state
+			} else if (curi != null) {
+                if (DocumentHelper.isDirectory(this, curi)) {
+                    // Correctly identified as directory for new file
+                    current_saf_uri = curi;
+                    fmode = FILE_NEW;
+                    name = "";
+                } else if (fileOpen(curi)) {
+                    // It's a file, open it (e.g. shortcut to specific file)
+                } else {
+                    fmode = FILE_NEW;
+                    name = "";
+                }
+            } else {
         		fmode = FILE_NEW;
         		name = "";
         		if (Intent.ACTION_SEND.equals(action)) setSharedText(intent.getExtras());
@@ -268,10 +307,12 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
     @Override
     public void onSaveInstanceState(Bundle sis){
 		if (current_saf_uri != null) sis.putString("current_saf_uri", current_saf_uri.toString());
+		if (current_uri != null) sis.putString("current_uri", current_uri.toString());
     	sis.putString("name", name);
+		sis.putInt("fmode", fmode);
     	if (pass != null) sis.putString("pass", pass);
     	if (former != null) sis.putString("former", former);
-    	if (priv != false) sis.putBoolean("priv", priv);
+    	sis.putBoolean("priv", priv);
     	super.onSaveInstanceState(sis);
     }
     
@@ -300,29 +341,53 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 			if (pos == 0) {
 				current_saf_uri = saf_uri;
 			} else {
-				DocumentFile root = DocumentFile.fromTreeUri(this, saf_uri);
-				DocumentFile sub = root.findFile(dirs.get(pos));
-				if (sub != null) current_saf_uri = sub.getUri();
+				try {
+					DocumentFile root = DocumentFile.fromTreeUri(this, saf_uri);
+					if (root != null) {
+						DocumentFile sub = root.findFile(dirs.get(pos));
+						if (sub != null) {
+							current_saf_uri = sub.getUri();
+						}
+					}
+				} catch (Exception e) {
+					Log.e(TAG, "Error in doMove", e);
+				}
 			}
 			fmode = FILE_NEW;
 			name = "";
 			label.setText(R.string.label_new);
+			listDirs();
 		}
     }
 
     public boolean fileOpen(Uri uri){
 		current_uri = uri;
+		Log.d(TAG, "fileOpen: Attempting to open " + uri);
     	try {
+			// Grant persistable permission if possible
+			try {
+				getContentResolver().takePersistableUriPermission(uri,
+						Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+			} catch (SecurityException se) {
+				Log.w(TAG, "fileOpen: Could not take persistable permission for " + uri + " - " + se.getMessage());
+			}
+
 			String content = DocumentHelper.readFile(this, uri);
 			DocumentFile df = DocumentFile.fromSingleUri(this, uri);
 			if (df != null) {
 				name = df.getName();
+				label.setText(name);
 			}
+			etxt.removeTextChangedListener(this);
 			etxt.setText(content);
-			former = etxt.getText().toString();
+			etxt.addTextChangedListener(this);
+			former = content;
+			fmode = FILE_OPEN;
+			listDirs();
 			return true;
-		} catch (IOException e) {
-			Log.e(TAG, "fileOpen IOException", e);
+		} catch (Exception e) {
+			Log.e(TAG, "fileOpen: Failed for " + uri, e);
+			Toast.makeText(getApplicationContext(), R.string.mes_not_open, Toast.LENGTH_LONG).show();
 			return false;
 		}
     }
@@ -361,9 +426,24 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 				former = etxt.getText().toString();
 				fmode = FILE_OPEN;
 				// After writing, we need to update current_uri to the actual file URI
-				DocumentFile root = DocumentFile.fromTreeUri(this, current_saf_uri);
-				DocumentFile df = root.findFile(name);
-				if (df != null) current_uri = df.getUri();
+				try {
+					DocumentFile root = DocumentFile.fromTreeUri(this, current_saf_uri);
+					if (root != null) {
+						DocumentFile df = root.findFile(name);
+						if (df != null) {
+							current_uri = df.getUri();
+							// Take persistable permission for the new/updated file
+							try {
+								getContentResolver().takePersistableUriPermission(current_uri,
+										Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+							} catch (SecurityException se) {
+								Log.w(TAG, "Could not take persistable permission for " + current_uri);
+							}
+						}
+					}
+				} catch (Exception e) {
+					Log.e(TAG, "Error updating current_uri", e);
+				}
 				return true;
 			}
 			return false;
@@ -371,7 +451,7 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 		return false;
     }
 
-    public static String enTitle(int mode, String line){
+    public String enTitle(int mode, String line){
     	String newname;
     	String ext;
     	if (priv == true){
@@ -411,7 +491,16 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 
 	public void listDirs() {
 		if (saf_uri != null) {
-			llp.listDir(null, adirs, dirs, ebox, this, null);
+			String currentName = null;
+			if (current_saf_uri != null && !current_saf_uri.equals(saf_uri)) {
+				try {
+					DocumentFile df = DocumentFile.fromSingleUri(this, current_saf_uri);
+					if (df != null) currentName = df.getName();
+				} catch (Exception e) {
+					Log.e(TAG, "Error getting current folder name", e);
+				}
+			}
+			llp.listDir(null, adirs, dirs, ebox, this, currentName);
 		}
 	}
 
@@ -436,6 +525,17 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
     @Override
     public boolean onOptionsItemSelected(MenuItem mi){
     	switch (mi.getItemId()){
+		case android.R.id.home:
+			if (!dontsave) {
+				if (priv) {
+					doSave(toEncrypt(pass, etxt.getText().toString()));
+				} else {
+					doSave(etxt.getText().toString());
+				}
+				dontsave = true;
+			}
+			finish();
+			return true;
     	case R.id.menu_save:
     		dontsave = true;
     		if (priv){
@@ -476,7 +576,22 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
     	SharedPreferences sprefs = PreferenceManager.getDefaultSharedPreferences(this);
 		String saf_uri_string = sprefs.getString("saf_uri", null);
 		if (saf_uri_string != null) {
-			saf_uri = Uri.parse(saf_uri_string);
+			try {
+				Uri uri = Uri.parse(saf_uri_string);
+				if (Build.VERSION.SDK_INT >= 24) {
+					if (DocumentsContract.isTreeUri(uri)) {
+						saf_uri = uri;
+					} else {
+						Log.e(TAG, "saf_uri in prefs is NOT a tree URI: " + saf_uri_string);
+						saf_uri = null;
+					}
+				} else {
+					saf_uri = uri;
+				}
+			} catch (Exception e) {
+				Log.e(TAG, "Error parsing saf_uri", e);
+				saf_uri = null;
+			}
 		}
     	font_size = Float.parseFloat(sprefs.getString("font_size", "18.0f"));
     	look_style = Integer.parseInt(sprefs.getString("look_style", "0"));

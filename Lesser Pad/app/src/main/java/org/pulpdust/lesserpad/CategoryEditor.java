@@ -16,6 +16,8 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
+import android.provider.DocumentsContract;
+import android.util.Log;
 import androidx.core.content.PermissionChecker;
 import androidx.documentfile.provider.DocumentFile;
 import android.view.LayoutInflater;
@@ -148,10 +150,16 @@ public class CategoryEditor extends Activity {
     
     public boolean isDeletable(String name){
 		if (saf_uri != null) {
-			DocumentFile root = DocumentFile.fromTreeUri(this, saf_uri);
-			DocumentFile dir = root.findFile(name);
-			if (dir != null) {
-				return dir.listFiles().length == 0;
+			try {
+				DocumentFile root = DocumentFile.fromTreeUri(this, saf_uri);
+				if (root != null) {
+					DocumentFile dir = root.findFile(name);
+					if (dir != null) {
+						return dir.listFiles().length == 0;
+					}
+				}
+			} catch (Exception e) {
+				Log.e(TAG, "Error in isDeletable", e);
 			}
 			return false;
 		}
@@ -181,12 +189,18 @@ public class CategoryEditor extends Activity {
 				boolean success = false;
 				String naming = input.getText().toString();
 				if (saf_uri != null) {
-					DocumentFile root = DocumentFile.fromTreeUri(CategoryEditor.this, saf_uri);
-					if (oldname != null && !naming.equals("")) {
-						DocumentFile dir = root.findFile(oldname);
-						if (dir != null) success = dir.renameTo(naming);
-					} else if (!naming.equals("")) {
-						success = root.createDirectory(naming) != null;
+					try {
+						DocumentFile root = DocumentFile.fromTreeUri(CategoryEditor.this, saf_uri);
+						if (root != null) {
+							if (oldname != null && !naming.equals("")) {
+								DocumentFile dir = root.findFile(oldname);
+								if (dir != null) success = dir.renameTo(naming);
+							} else if (!naming.equals("")) {
+								success = root.createDirectory(naming) != null;
+							}
+						}
+					} catch (Exception e) {
+						Log.e(TAG, "Error in namingOhji", e);
 					}
 				} else {
 					if (oldname != null && !naming.equals("")){
@@ -221,9 +235,15 @@ public class CategoryEditor extends Activity {
     	           public void onClick(DialogInterface dialog, int id) {
 					   boolean success = false;
 					   if (saf_uri != null) {
-						   DocumentFile root = DocumentFile.fromTreeUri(CategoryEditor.this, saf_uri);
-						   DocumentFile dir = root.findFile(dirs.get(mlist.getCheckedItemPosition()));
-						   if (dir != null) success = dir.delete();
+						   try {
+							   DocumentFile root = DocumentFile.fromTreeUri(CategoryEditor.this, saf_uri);
+							   if (root != null) {
+								   DocumentFile dir = root.findFile(dirs.get(mlist.getCheckedItemPosition()));
+								   if (dir != null) success = dir.delete();
+							   }
+						   } catch (Exception e) {
+							   Log.e(TAG, "Error in sureDelete", e);
+						   }
 					   } else {
 						   success = LesserPadActivity.doDelete(parent, dirs.get(mlist.getCheckedItemPosition()));
 					   }
@@ -265,7 +285,22 @@ public class CategoryEditor extends Activity {
     	SharedPreferences sprefs = PreferenceManager.getDefaultSharedPreferences(this);
 		String saf_uri_string = sprefs.getString("saf_uri", null);
 		if (saf_uri_string != null) {
-			saf_uri = Uri.parse(saf_uri_string);
+			try {
+				Uri uri = Uri.parse(saf_uri_string);
+				if (Build.VERSION.SDK_INT >= 24) {
+					if (DocumentsContract.isTreeUri(uri)) {
+						saf_uri = uri;
+					} else {
+						Log.e(TAG, "saf_uri in prefs is NOT a tree URI: " + saf_uri_string);
+						saf_uri = null;
+					}
+				} else {
+					saf_uri = uri;
+				}
+			} catch (Exception e) {
+				Log.e(TAG, "Error parsing saf_uri", e);
+				saf_uri = null;
+			}
 		} else {
 			saf_uri = null;
 		}
