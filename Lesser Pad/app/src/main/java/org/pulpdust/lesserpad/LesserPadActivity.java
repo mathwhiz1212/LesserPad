@@ -48,6 +48,7 @@ import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toolbar;
 import androidx.documentfile.provider.DocumentFile;
 import android.widget.Toast;
 
@@ -176,6 +177,7 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
         etxt = (EditText) findViewById(R.id.editText1);
     	etxt.setTextSize(font_size);
         etxt.addTextChangedListener(this);
+
         ebox = (Spinner) findViewById(R.id.spinner1);
         label = (TextView) findViewById(R.id.textView1);
         dirs = new ArrayList<String>();
@@ -547,6 +549,59 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
     	case R.id.menu_delete:
     		sureDelete(this).show();
     		return true;
+        case R.id.menu_paste:
+            etxt.requestFocus();
+            etxt.onTextContextMenuItem(android.R.id.paste);
+            return true;
+        case R.id.menu_selectall:
+            etxt.requestFocus();
+            etxt.selectAll();
+            return true;
+        case R.id.menu_copy:
+            etxt.requestFocus();
+            etxt.onTextContextMenuItem(android.R.id.copy);
+            return true;
+        case R.id.menu_cut:
+            etxt.requestFocus();
+            etxt.onTextContextMenuItem(android.R.id.cut);
+            return true;
+        case R.id.menu_undo:
+            // Very basic undo if 'former' was set
+            if (former != null) {
+                String current = etxt.getText().toString();
+                etxt.setText(former);
+                former = current;
+                etxt.setSelection(etxt.getText().length());
+            }
+            return true;
+        case R.id.menu_search:
+            llp.goSearch(this, etxt);
+            return true;
+        case R.id.menu_share:
+            Intent sit = new Intent(Intent.ACTION_SEND);
+            sit.setType("text/plain");
+            sit.putExtra(Intent.EXTRA_TEXT, etxt.getText().toString());
+            startActivity(Intent.createChooser(sit, getString(R.string.menu_share)));
+            return true;
+        case R.id.menu_detail:
+            if (current_uri != null) {
+                DocumentFile df = DocumentFile.fromSingleUri(this, current_uri);
+                if (df != null) {
+                    String info = getString(R.string.dialog_name) + ": " + df.getName() + "\n" +
+                                 getString(R.string.dialog_update) + ": " + new java.util.Date(df.lastModified()).toString() + "\n" +
+                                 getString(R.string.dialog_length) + ": " + df.length() + " B";
+                    new AlertDialog.Builder(this)
+                        .setTitle(R.string.dialog_detail)
+                        .setMessage(info)
+                        .setPositiveButton(R.string.dialog_ok, null)
+                        .show();
+                }
+            }
+            return true;
+        case R.id.menu_settings:
+            Intent pit = new Intent(this, LesserPadPrefs.class);
+            startActivityForResult(pit, 0);
+            return true;
     	default:
     		return super.onOptionsItemSelected(mi);
     	}

@@ -117,9 +117,14 @@ public class libLesserPad {
 		context.startActivity(gosearch);
     }
     public String getSelection(boolean deletion, EditText etxt){
+        if (etxt == null) return "";
+
 		Editable edit = etxt.getEditableText();
 		int start = etxt.getSelectionStart();
 		int end = etxt.getSelectionEnd();
+		
+        if (start == end) return ""; // No selection
+        
 		char select[] = new char[Math.max( start, end ) - Math.min( start, end )];
 		edit.getChars(Math.min( start, end ), Math.max( start, end ), select, 0);
 		if (deletion){
