@@ -155,7 +155,8 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 					if (Build.VERSION.SDK_INT >= 24) {
 						isTree = DocumentsContract.isTreeUri(current_saf_uri);
 					}
-					boolean isTreeAwareDoc = current_saf_uri.getPath() != null && current_saf_uri.getPath().contains("/tree/") && current_saf_uri.getPath().contains("/document/");
+					boolean isTreeAwareDoc = current_saf_uri.getPath() != null && 
+							(current_saf_uri.getPath().contains("/tree/") || current_saf_uri.getPath().contains("/document/"));
 					
 					if (Build.VERSION.SDK_INT >= 24 && !isTree && !isTreeAwareDoc) {
 						Log.w(TAG, "PATH extra is not a valid SAF URI, falling back: " + pathExtra);
@@ -308,17 +309,17 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
     	}
     }
 
-    @Override
-    public void onSaveInstanceState(Bundle sis){
+	@Override
+	public void onSaveInstanceState(Bundle sis){
 		if (current_saf_uri != null) sis.putString("current_saf_uri", current_saf_uri.toString());
 		if (current_uri != null) sis.putString("current_uri", current_uri.toString());
-    	sis.putString("name", name);
+		sis.putString("name", name);
 		sis.putInt("fmode", fmode);
-    	if (pass != null) sis.putString("pass", pass);
-    	if (former != null) sis.putString("former", former);
-    	sis.putBoolean("priv", priv);
-    	super.onSaveInstanceState(sis);
-    }
+		if (pass != null) sis.putString("pass", pass);
+		if (former != null) sis.putString("former", former);
+		sis.putBoolean("priv", priv);
+		super.onSaveInstanceState(sis);
+	}
     
     public class Mover implements OnItemSelectedListener {
 		@Override

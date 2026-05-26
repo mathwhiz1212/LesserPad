@@ -68,6 +68,7 @@ public class LesserPadListActivity extends FragmentActivity {
 	ArrayAdapter<String> amemos;
 	List<String> memos = new ArrayList<String>();
 	List<String> ls = new ArrayList<String>();
+	List<Uri> luris = new ArrayList<Uri>();
 	libLesserPad llp = new libLesserPad();
 	boolean normal_stop = true;
 
@@ -77,7 +78,7 @@ public class LesserPadListActivity extends FragmentActivity {
     public void onCreate(Bundle savedInstanceState) {
         readPrefs();
 		if (look_style == -1) {
-			if (getResources().getConfiguration().isNightModeActive()){
+			if (Build.VERSION.SDK_INT >= 30 && getResources().getConfiguration().isNightModeActive()){
 				look_style = 1;
 			} else {
 				look_style = 0;
@@ -102,8 +103,9 @@ public class LesserPadListActivity extends FragmentActivity {
         label = (TextView) findViewById(R.id.textView2);
         mlist = (ListView) findViewById(R.id.listView1);
         newbtn = (Button) findViewById(R.id.button1);
-        dirs = new ArrayList<String>();
-        adirs = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, dirs);
+	dirs = new ArrayList<String>();
+	luris = new ArrayList<Uri>();
+	adirs = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, dirs);
         adirs.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         ebox.setAdapter(adirs);
         if (newbtn != null) {
@@ -128,85 +130,54 @@ public class LesserPadListActivity extends FragmentActivity {
 			mlist.setBackgroundColor(Color.rgb(250,250,250));
 		}
 
-        amemos = new ArrayAdapter<String>(this, R.layout.list_item, memos){
-        	@Override
-        	public View getView(int pos, View v, ViewGroup vg){
-        		TextView tview = (TextView) super.getView(pos, v, vg);
-        		tview.setTextSize(font_size);
-				if (Build.VERSION.SDK_INT >= 21){
-					tview.setBackgroundColor(getResources().getColor(android.R.color.transparent));
-				}
-        		return tview;
-        	}
-        };
-        mlist.setAdapter(amemos);
-        mlist.setOnItemClickListener(new OnItemClickListener(){
-			@Override
-			public void onItemClick(AdapterView<?> av, View v, int pos,
-					long id) {
-				if (ls.get(pos).endsWith(".len")){
-					Intent pit = new Intent();
-					pit.setClassName("org.pulpdust.lesserpad", "org.pulpdust.lesserpad.ProtectActivity");
-					pit.putExtra(libLesserPad.CRYPT_FILE, (ls.get(pos)));
-					pit.putExtra(libLesserPad.REQ_PASS_MODE, libLesserPad.REQ_PASS_FOR_OPEN);
-					startActivityForResult(pit, REQ_PASS);
-				} else {
-					Intent intent = new Intent(libLesserPad.LPAD_EDIT);
-					intent.setComponent(new ComponentName("org.pulpdust.lesserpad", "org.pulpdust.lesserpad.LesserPadActivity"));
-	        		intent.putExtra("PATH", current_saf_uri.toString());
-					try {
-						DocumentFile root = null;
-						if (current_saf_uri.equals(saf_uri)) {
-							root = DocumentFile.fromTreeUri(LesserPadListActivity.this, saf_uri);
-						} else {
-							// For subfolders, fromTreeUri might be risky if not a tree URI
-							if (DocumentsContract.isTreeUri(current_saf_uri)) {
-								root = DocumentFile.fromTreeUri(LesserPadListActivity.this, current_saf_uri);
-							} else {
-								// Try to use it as a tree-aware document URI
-								root = DocumentFile.fromTreeUri(LesserPadListActivity.this, current_saf_uri);
-							}
-						}
-						if (root != null) {
-							DocumentFile file = root.findFile(ls.get(pos));
-							if (file != null) {
-								intent.setData(file.getUri());
-								intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-							}
-						}
-					} catch (Exception e) {
-						Log.e(TAG, "Error in onItemClick", e);
-					}
-					startActivityForResult(intent, 1);
-				}
+	amemos = new ArrayAdapter<String>(this, R.layout.list_item, memos){
+		@Override
+		public View getView(int pos, View v, ViewGroup vg){
+			TextView tview = (TextView) super.getView(pos, v, vg);
+			tview.setTextSize(font_size);
+			if (Build.VERSION.SDK_INT >= 21){
+				tview.setBackgroundColor(getResources().getColor(android.R.color.transparent));
 			}
-        });
-        mlist.setOnItemLongClickListener(new OnItemLongClickListener(){
-			@Override
-			public boolean onItemLongClick(AdapterView<?> av, View v,
-					int pos, long id) {
-				Intent intent = new Intent();
-				intent.setAction("android.intent.action.VIEW");
-				try {
-					DocumentFile root = null;
-					if (current_saf_uri.equals(saf_uri)) {
-						root = DocumentFile.fromTreeUri(LesserPadListActivity.this, saf_uri);
-					} else {
-						root = DocumentFile.fromTreeUri(LesserPadListActivity.this, current_saf_uri);
-					}
-					if (root != null) {
-						DocumentFile file = root.findFile(ls.get(pos));
-						if (file != null) {
-							intent.setDataAndType(file.getUri(), "text/plain");
-						}
-					}
-					startActivityForResult(intent, 3);
-				} catch (Exception e){
-					Log.e(TAG, e.getClass().getSimpleName());
-				}
-				return true;
+			return tview;
+		}
+	};
+	mlist.setAdapter(amemos);
+	mlist.setOnItemClickListener(new OnItemClickListener(){
+		@Override
+		public void onItemClick(AdapterView<?> av, View v, int pos,
+				long id) {
+			if (ls.get(pos).endsWith(".len")){
+				Intent pit = new Intent();
+				pit.setClassName("org.pulpdust.lesserpad", "org.pulpdust.lesserpad.ProtectActivity");
+				pit.putExtra(libLesserPad.CRYPT_FILE, (ls.get(pos)));
+				pit.putExtra(libLesserPad.REQ_PASS_MODE, libLesserPad.REQ_PASS_FOR_OPEN);
+				startActivityForResult(pit, REQ_PASS);
+			} else {
+				Intent intent = new Intent(libLesserPad.LPAD_EDIT);
+				intent.setComponent(new ComponentName("org.pulpdust.lesserpad", "org.pulpdust.lesserpad.LesserPadActivity"));
+				intent.putExtra("PATH", current_saf_uri.toString());
+				intent.setData(luris.get(pos));
+				intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+				startActivityForResult(intent, 1);
 			}
-        });
+		}
+	});
+	mlist.setOnItemLongClickListener(new OnItemLongClickListener(){
+		@Override
+		public boolean onItemLongClick(AdapterView<?> av, View v,
+				int pos, long id) {
+			Intent intent = new Intent();
+			intent.setAction("android.intent.action.VIEW");
+			intent.setDataAndType(luris.get(pos), "text/plain");
+			intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+			try {
+				startActivityForResult(intent, 3);
+			} catch (Exception e){
+				Log.e(TAG, e.getClass().getSimpleName());
+			}
+			return true;
+		}
+	});
         
         path = null;
 		if (current_saf_uri == null) {
@@ -229,10 +200,13 @@ public class LesserPadListActivity extends FragmentActivity {
         if (default_dir.equals("/")){
         	ebox.setEnabled(false);
         }
-		ebox.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
+
+		// Use a local final variable for the listener to ensure it's not being GC'd or detached
+		final AdapterView.OnItemSelectedListener listener = new AdapterView.OnItemSelectedListener(){
 			@Override
 			public void onItemSelected(AdapterView<?> av, View v, int pos,
 									   long id) {
+				Log.d(TAG, "Spinner onItemSelected: pos=" + pos + " isProgrammatic=" + isProgrammaticSelection);
 				if (!isProgrammaticSelection) {
 					doChange(pos);
 				}
@@ -240,28 +214,36 @@ public class LesserPadListActivity extends FragmentActivity {
 			@Override
 			public void onNothingSelected(AdapterView<?> arg0) {
 			}
-		});
+		};
+		ebox.setOnItemSelectedListener(listener);
     }
 
 	public void doChange(int pos){
+		Log.d(TAG, "doChange: pos=" + pos + " dirs.size=" + (dirs != null ? dirs.size() : "null"));
 		if (saf_uri != null) {
 			if (pos == 0) {
 				current_saf_uri = saf_uri;
+				Log.d(TAG, "doChange: Selected root, current_saf_uri=" + current_saf_uri);
 			} else {
 				try {
+					String folderName = dirs.get(pos);
+					Log.d(TAG, "doChange: Selected folder=" + folderName);
 					DocumentFile root = DocumentFile.fromTreeUri(this, saf_uri);
 					if (root != null) {
-						String folderName = dirs.get(pos);
 						DocumentFile sub = root.findFile(folderName);
 						if (sub != null && sub.isDirectory()) {
-							current_saf_uri = sub.getUri();
+							// For listing files in a subfolder, we need to provide a URI that the
+							// DocumentFile library can use as a new tree root.
+							// buildDocumentUriUsingTree creates a document URI that is still associated with the tree.
+							current_saf_uri = DocumentsContract.buildDocumentUriUsingTree(saf_uri, DocumentsContract.getDocumentId(sub.getUri()));
+							Log.d(TAG, "doChange: Found via findFile, current_saf_uri=" + current_saf_uri);
 						} else {
-							// Fallback: If findFile fails, it might be because the folder is nested 
-							// or the name doesn't match exactly. listDirs provides the names.
+							Log.d(TAG, "doChange: findFile failed for " + folderName + ", searching manually...");
 							List<DocumentFile> subdirs = DocumentHelper.listDirs(this, saf_uri);
 							for (DocumentFile df : subdirs) {
 								if (folderName.equals(df.getName())) {
-									current_saf_uri = df.getUri();
+									current_saf_uri = DocumentsContract.buildDocumentUriUsingTree(saf_uri, DocumentsContract.getDocumentId(df.getUri()));
+									Log.d(TAG, "doChange: Found via manual search, current_saf_uri=" + current_saf_uri);
 									break;
 								}
 							}
@@ -271,10 +253,12 @@ public class LesserPadListActivity extends FragmentActivity {
 					Log.e(TAG, "Error in doChange", e);
 				}
 			}
+			Log.d(TAG, "doChange: Final current_saf_uri=" + current_saf_uri);
 			getPreferences(MODE_PRIVATE).edit().putString("last_sub_uri", current_saf_uri.toString()).apply();
 			listMemos(null);
-			// Also update the dropdown selection text if needed
 			listDirs();
+		} else {
+			Log.w(TAG, "doChange: saf_uri is null!");
 		}
 	}
 
@@ -292,7 +276,13 @@ public class LesserPadListActivity extends FragmentActivity {
 			}
 			isProgrammaticSelection = true;
 			llp.listDir(null, adirs, dirs, ebox, this, currentName);
-			isProgrammaticSelection = false;
+			// Post a runnable to clear the flag to avoid race conditions with UI events
+			ebox.post(new Runnable() {
+				@Override
+				public void run() {
+					isProgrammaticSelection = false;
+				}
+			});
 		}
 	}
 
@@ -300,6 +290,7 @@ public class LesserPadListActivity extends FragmentActivity {
 		amemos.setNotifyOnChange(false);
     	amemos.clear();
 		ls.clear();
+		luris.clear();
 		if (current_saf_uri != null) {
 			List<DocumentFile> files = DocumentHelper.listFiles(this, current_saf_uri);
 			
@@ -327,6 +318,7 @@ public class LesserPadListActivity extends FragmentActivity {
 				String fname = file.getName();
 				if (fname != null && (fname.toLowerCase().endsWith(".txt") || fname.toLowerCase().endsWith(".len"))) {
 					ls.add(fname);
+					luris.add(file.getUri());
 					String displayName = fname;
 					if (hide_ext) {
 						int lastDot = fname.lastIndexOf('.');

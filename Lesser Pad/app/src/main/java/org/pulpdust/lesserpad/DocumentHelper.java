@@ -17,25 +17,50 @@ import java.util.List;
 public class DocumentHelper {
     private static final String TAG = "DocumentHelper";
 
-    public static List<DocumentFile> listFiles(Context context, Uri treeUri) {
+    public static List<DocumentFile> listFiles(Context context, Uri parentUri) {
         List<DocumentFile> files = new ArrayList<>();
-        if (treeUri == null) return files;
+        if (parentUri == null) return files;
         try {
-            DocumentFile root = DocumentFile.fromTreeUri(context, treeUri);
-            if (root != null && root.isDirectory()) {
-                DocumentFile[] rootFiles = root.listFiles();
-                if (rootFiles != null) {
-                    for (DocumentFile file : rootFiles) {
-                        if (file.isFile()) {
-                            files.add(file);
+            Uri childrenUri;
+            if (DocumentsContract.isDocumentUri(context, parentUri)) {
+                childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(parentUri, 
+                        DocumentsContract.getDocumentId(parentUri));
+            } else {
+                childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(parentUri, 
+                        DocumentsContract.getTreeDocumentId(parentUri));
+            }
+
+            try (android.database.Cursor cursor = context.getContentResolver().query(childrenUri,
+                    new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                                 DocumentsContract.Document.COLUMN_MIME_TYPE},
+                    null, null, null)) {
+                if (cursor != null) {
+                    while (cursor.moveToNext()) {
+                        String docId = cursor.getString(0);
+                        String mime = cursor.getString(1);
+                        if (!DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) {
+                            Uri fileUri = DocumentsContract.buildDocumentUriUsingTree(parentUri, docId);
+                            files.add(DocumentFile.fromSingleUri(context, fileUri));
                         }
                     }
                 }
             }
-        } catch (SecurityException se) {
-            Log.e(TAG, "SecurityException listing files for URI: " + treeUri, se);
         } catch (Exception e) {
-            Log.e(TAG, "Error listing files for URI: " + treeUri, e);
+            Log.e(TAG, "Error listing files for URI: " + parentUri, e);
+            // Fallback to basic DocumentFile if query fails
+            try {
+                DocumentFile df = DocumentFile.fromTreeUri(context, parentUri);
+                if (df != null && df.isDirectory()) {
+                    DocumentFile[] rootFiles = df.listFiles();
+                    if (rootFiles != null) {
+                        for (DocumentFile file : rootFiles) {
+                            if (file.isFile()) files.add(file);
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                Log.e(TAG, "Fallback listFiles failed", ex);
+            }
         }
         return files;
     }
@@ -92,22 +117,28 @@ public class DocumentHelper {
         if (uri == null) return false;
         try {
             DocumentFile file = null;
-            // Check if it's a directory we can write into
-            DocumentFile dir = null;
-            try {
-                dir = DocumentFile.fromTreeUri(context, uri);
-            } catch (SecurityException se) {
-                Log.w(TAG, "Not a permitted tree URI: " + uri);
+            // Try to find if the file already exists in this folder
+            List<DocumentFile> existing = listFiles(context, uri);
+            for (DocumentFile df : existing) {
+                if (filename.equals(df.getName())) {
+                    file = df;
+                    break;
+                }
             }
 
-            if (dir != null && dir.isDirectory()) {
-                file = dir.findFile(filename);
-                if (file == null) {
-                    file = dir.createFile("text/plain", filename);
+            if (file == null) {
+                // If not found, try to create it
+                if (DocumentsContract.isDocumentUri(context, uri)) {
+                    Uri newFileUri = DocumentsContract.createDocument(context.getContentResolver(), uri, "text/plain", filename);
+                    if (newFileUri != null) {
+                        file = DocumentFile.fromSingleUri(context, newFileUri);
+                    }
+                } else {
+                    DocumentFile dir = DocumentFile.fromTreeUri(context, uri);
+                    if (dir != null && dir.isDirectory()) {
+                        file = dir.createFile("text/plain", filename);
+                    }
                 }
-            } else if (DocumentsContract.isDocumentUri(context, uri)) {
-                // It might be a single document URI
-                file = DocumentFile.fromSingleUri(context, uri);
             }
 
             if (file != null) {
