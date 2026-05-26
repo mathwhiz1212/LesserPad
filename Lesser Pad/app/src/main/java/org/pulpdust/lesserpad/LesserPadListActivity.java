@@ -71,6 +71,8 @@ public class LesserPadListActivity extends FragmentActivity {
 	libLesserPad llp = new libLesserPad();
 	boolean normal_stop = true;
 
+    private boolean isProgrammaticSelection = false;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         readPrefs();
@@ -231,7 +233,9 @@ public class LesserPadListActivity extends FragmentActivity {
 			@Override
 			public void onItemSelected(AdapterView<?> av, View v, int pos,
 									   long id) {
-				doChange(pos);
+				if (!isProgrammaticSelection) {
+					doChange(pos);
+				}
 			}
 			@Override
 			public void onNothingSelected(AdapterView<?> arg0) {
@@ -251,6 +255,16 @@ public class LesserPadListActivity extends FragmentActivity {
 						DocumentFile sub = root.findFile(folderName);
 						if (sub != null && sub.isDirectory()) {
 							current_saf_uri = sub.getUri();
+						} else {
+							// Fallback: If findFile fails, it might be because the folder is nested 
+							// or the name doesn't match exactly. listDirs provides the names.
+							List<DocumentFile> subdirs = DocumentHelper.listDirs(this, saf_uri);
+							for (DocumentFile df : subdirs) {
+								if (folderName.equals(df.getName())) {
+									current_saf_uri = df.getUri();
+									break;
+								}
+							}
 						}
 					}
 				} catch (Exception e) {
@@ -259,6 +273,8 @@ public class LesserPadListActivity extends FragmentActivity {
 			}
 			getPreferences(MODE_PRIVATE).edit().putString("last_sub_uri", current_saf_uri.toString()).apply();
 			listMemos(null);
+			// Also update the dropdown selection text if needed
+			listDirs();
 		}
 	}
 
@@ -274,7 +290,9 @@ public class LesserPadListActivity extends FragmentActivity {
 					Log.e(TAG, "Error in listDirs", e);
 				}
 			}
+			isProgrammaticSelection = true;
 			llp.listDir(null, adirs, dirs, ebox, this, currentName);
+			isProgrammaticSelection = false;
 		}
 	}
 
@@ -413,6 +431,13 @@ public class LesserPadListActivity extends FragmentActivity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data){
     	switch (requestCode){
     	case 0:
+    		if (resultCode == RESULT_OK && data != null){
+				String new_parent = data.getStringExtra("PATH");
+				if (new_parent != null) {
+					current_saf_uri = Uri.parse(new_parent);
+					getPreferences(MODE_PRIVATE).edit().putString("last_sub_uri", current_saf_uri.toString()).apply();
+				}
+    		}
     		readPrefs();
 			listMemos(null);
 			listDirs();
@@ -422,6 +447,7 @@ public class LesserPadListActivity extends FragmentActivity {
 				String new_parent = data.getStringExtra("PATH");
 				if (new_parent != null) {
 					current_saf_uri = Uri.parse(new_parent);
+					getPreferences(MODE_PRIVATE).edit().putString("last_sub_uri", current_saf_uri.toString()).apply();
 				}
     		}
     		readPrefs();

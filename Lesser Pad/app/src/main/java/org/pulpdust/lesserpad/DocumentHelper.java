@@ -171,6 +171,29 @@ public class DocumentHelper {
         }
     }
 
+    public static Uri moveFile(Context context, Uri fileUri, Uri sourceFolderUri, Uri targetFolderUri) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            try {
+                // DocumentsContract.moveDocument requires document URIs, not tree URIs, for source and target
+                Uri sourceDocUri = sourceFolderUri;
+                if (!DocumentsContract.isDocumentUri(context, sourceDocUri)) {
+                    sourceDocUri = DocumentsContract.buildDocumentUriUsingTree(sourceDocUri, DocumentsContract.getTreeDocumentId(sourceDocUri));
+                }
+                
+                Uri targetDocUri = targetFolderUri;
+                if (!DocumentsContract.isDocumentUri(context, targetDocUri)) {
+                    targetDocUri = DocumentsContract.buildDocumentUriUsingTree(targetDocUri, DocumentsContract.getTreeDocumentId(targetDocUri));
+                }
+                
+                Log.d(TAG, "Moving " + fileUri + " from " + sourceDocUri + " to " + targetDocUri);
+                return DocumentsContract.moveDocument(context.getContentResolver(), fileUri, sourceDocUri, targetDocUri);
+            } catch (Exception e) {
+                Log.e(TAG, "Error moving document", e);
+            }
+        }
+        return null;
+    }
+
     public static DocumentFile getOrCreateFolder(Context context, Uri treeUri, String folderName) {
         if (treeUri == null) return null;
         try {

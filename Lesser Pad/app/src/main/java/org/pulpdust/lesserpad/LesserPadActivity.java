@@ -116,6 +116,8 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 		}
 	}
 
+    private boolean isProgrammaticSelection = false;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
 		Intent intent = getIntent();
@@ -322,7 +324,9 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 		@Override
 		public void onItemSelected(AdapterView<?> av, View v, int pos,
 				long id) {
-			doMove(getApplicationContext(), pos);
+			if (!isProgrammaticSelection) {
+				doMove(getApplicationContext(), pos);
+			}
 		}
 		@Override
 		public void onNothingSelected(AdapterView<?> arg0) {
@@ -340,24 +344,58 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 
     public void doMove(Context context, int pos){
 		if (saf_uri != null) {
+			Uri target_saf_uri;
 			if (pos == 0) {
-				current_saf_uri = saf_uri;
+				target_saf_uri = saf_uri;
 			} else {
 				try {
 					DocumentFile root = DocumentFile.fromTreeUri(this, saf_uri);
 					if (root != null) {
 						DocumentFile sub = root.findFile(dirs.get(pos));
 						if (sub != null) {
-							current_saf_uri = sub.getUri();
+							target_saf_uri = sub.getUri();
+						} else {
+							return;
 						}
+					} else {
+						return;
 					}
 				} catch (Exception e) {
 					Log.e(TAG, "Error in doMove", e);
+					return;
 				}
 			}
-			fmode = FILE_NEW;
-			name = "";
-			label.setText(R.string.label_new);
+
+			// Normalize for comparison
+			Uri currentDocUri = current_saf_uri;
+			if (currentDocUri != null && !DocumentsContract.isDocumentUri(this, currentDocUri)) {
+				currentDocUri = DocumentsContract.buildDocumentUriUsingTree(currentDocUri, DocumentsContract.getTreeDocumentId(currentDocUri));
+			}
+			Uri targetDocUri = target_saf_uri;
+			if (targetDocUri != null && !DocumentsContract.isDocumentUri(this, targetDocUri)) {
+				targetDocUri = DocumentsContract.buildDocumentUriUsingTree(targetDocUri, DocumentsContract.getTreeDocumentId(targetDocUri));
+			}
+
+			if (targetDocUri != null && targetDocUri.equals(currentDocUri)) {
+				return;
+			}
+
+			if (fmode == FILE_OPEN && current_uri != null) {
+				Uri result = DocumentHelper.moveFile(this, current_uri, current_saf_uri, target_saf_uri);
+				if (result != null) {
+					current_uri = result;
+					current_saf_uri = target_saf_uri;
+					Toast.makeText(getApplicationContext(), R.string.mes_save, Toast.LENGTH_SHORT).show();
+				} else {
+					Log.e(TAG, "moveFile failed: current_uri=" + current_uri + ", current_saf_uri=" + current_saf_uri + ", target_saf_uri=" + target_saf_uri);
+					Toast.makeText(getApplicationContext(), R.string.mes_move_fail, Toast.LENGTH_SHORT).show();
+					// Reset spinner to current location since move failed
+					listDirs();
+					return;
+				}
+			} else {
+				current_saf_uri = target_saf_uri;
+			}
 			listDirs();
 		}
     }
@@ -502,7 +540,9 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
 					Log.e(TAG, "Error getting current folder name", e);
 				}
 			}
+			isProgrammaticSelection = true;
 			llp.listDir(null, adirs, dirs, ebox, this, currentName);
+			isProgrammaticSelection = false;
 		}
 	}
 
@@ -626,6 +666,16 @@ public class LesserPadActivity extends FragmentActivity implements TextWatcher {
     		.setNegativeButton(R.string.dialog_cancel, null)
     		.create();
     }
+
+	@Override
+	public void finish() {
+		Intent data = new Intent();
+		if (current_saf_uri != null) {
+			data.putExtra("PATH", current_saf_uri.toString());
+		}
+		setResult(RESULT_OK, data);
+		super.finish();
+	}
 
     public void readPrefs(){
     	SharedPreferences sprefs = PreferenceManager.getDefaultSharedPreferences(this);
